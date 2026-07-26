@@ -2,11 +2,21 @@ import streamlit as st
 import pandas as pd
 import os
 import sqlite3
+from sqlalchemy import create_engine
+from dotenv import load_dotenv
 
 # 1. Page Configuration
 st.set_page_config(page_title="Dashboard Commercial Pegasus", layout="wide", page_icon="📊")
 
 st.title("📊 Analyse des Performances Commerciales")
+
+
+load_dotenv()  # Load environment variables from .env file
+
+engine = create_engine(
+    f"mysql+pymysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASS')}@"
+    f"{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+)
 
 # 2. Data Ingestion & Caching
 # The @st.cache_data decorator ensures the app doesn't reload the Excel file every time you click a button
