@@ -6,6 +6,9 @@ import urllib.parse
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 
+# ========================================================
+# 1. PAGE CONFIG & ENVIRONMENT SETUP
+# ========================================================
 st.set_page_config(page_title="Dashboard Commercial Pegasus", layout="wide", page_icon="📊")
 
 load_dotenv()
@@ -18,7 +21,7 @@ DB_NAME = os.getenv('DB_NAME', 'pegasus_db')
 # Safely encode the password to handle special characters like '@'
 safe_password = urllib.parse.quote_plus(DB_PASS)
 
-# Create SQLAlchemy Engine using the encoded password
+# Create SQLAlchemy Engine
 engine = create_engine(f"mysql+pymysql://{DB_USER}:{safe_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
 
 # ========================================================
@@ -59,10 +62,10 @@ if not st.session_state.authenticated:
                 st.rerun()
             else:
                 st.error("Identifiants incorrects ou compte désactivé.")
-    st.stop() # Halts execution here if not authenticated
+    st.stop()
 
 # ========================================================
-# 3. HELPER FUNCTIONS FOR ETL (Data Engineering)
+# 3. HELPER FUNCTIONS & ETL PIPELINE
 # ========================================================
 def get_region(ville):
     regions = {
@@ -81,7 +84,7 @@ def get_puissance_cat(kva):
     else: return 'Très Haute Puissance'
 
 def export_to_star_schema(df):
-    """ETL Pipeline: Maps flat data into the MySQL Star Schema"""
+    """ETL Pipeline: Maps 100% of the flat sanitized data into the MySQL Star Schema"""
     try:
         with engine.connect() as conn:
             # --- 1. DIMENSION CLIENTS ---
@@ -115,7 +118,7 @@ def export_to_star_schema(df):
             new_prods['categorie_puissance'] = new_prods['Puissance_kVA'].apply(get_puissance_cat)
             new_prods.rename(columns={'Moteur': 'moteur', 'Alternateur': 'alternateur', 'Puissance_kVA': 'puissance_kva'}, inplace=True)
             existing_prods = pd.read_sql("SELECT moteur, alternateur, puissance_kva FROM dim_produits", conn)
-            # Create a composite key for merging to find missing ones safely
+            
             merged_prods = new_prods.merge(existing_prods, on=['moteur', 'alternateur', 'puissance_kva'], how='left', indicator=True)
             missing_prods = merged_prods[merged_prods['_merge'] == 'left_only'].drop(columns=['_merge'])
             if not missing_prods.empty:
@@ -123,13 +126,11 @@ def export_to_star_schema(df):
             dim_prods = pd.read_sql("SELECT id_produit, moteur as Moteur, alternateur as Alternateur, puissance_kva as Puissance_kVA FROM dim_produits", conn)
 
             # --- 5. FACT VENTES (MERGE IDs) ---
-            # Map dimensions to the main dataframe
             fact_df = df.merge(dim_clients, on='Client', how='left')
             fact_df = fact_df.merge(dim_commerciaux, on='Commercial', how='left')
             fact_df = fact_df.merge(dim_locs, on='Ville', how='left')
             fact_df = fact_df.merge(dim_prods, on=['Moteur', 'Alternateur', 'Puissance_kVA'], how='left')
 
-            # Select and rename columns to match the fact_ventes schema
             cols_to_keep = ['Date_Commande', 'id_client', 'id_commercial', 'id_localisation', 'id_produit', 
                             'Statut', 'Jours_Livraison', 'Quantite', 'Prix_Unitaire_MAD', 'Chiffre_Affaires_MAD', 'Cout_MAD']
             
@@ -138,12 +139,13 @@ def export_to_star_schema(df):
             # Insert into MySQL
             fact_final.to_sql('fact_ventes', conn, if_exists='append', index=False)
             
+            # Save Transaction
             conn.commit()
             
-        return True
+        return len(fact_final)
     except Exception as e:
         st.error(f"Erreur lors de l'exportation: {e}")
-        return False
+        return 0
 
 # ========================================================
 # 4. DASHBOARD UI (Protected Area)
@@ -182,35 +184,71 @@ try:
     col_clean, col_export = st.columns(2)
     
     with col_clean:
-        st.write("**Étape 1: Nettoyage Automatique**")
-        if st.button("Sanitiser les données"):
+        st.write("**Étape 1: Nettoyage Intelligent & Formatage**")
+        if st.button("✨ Sanitiser et Standardiser les Données"):
             initial_rows = len(df)
-            df = df.drop_duplicates()
-            for col in df.columns:
-                if pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_string_dtype(df[col]):
-                    df[col] = df[col].fillna("Non Spécifié").astype(str).str.strip()
-                else:
-                    df[col] = df[col].fillna(0)
+            cleaned = df.copy()
+            
+            # 1. Remove exact duplicate rows
+            cleaned = cleaned.drop_duplicates()
+            
+            # 2. Capitalization & String Normalization
+            if 'Ville' in cleaned.columns:
+                cleaned['Ville'] = cleaned['Ville'].astype(str).str.strip().str.title()
+            if 'Client' in cleaned.columns:
+                cleaned['Client'] = cleaned['Client'].fillna("NON SPÉCIFIÉ").astype(str).str.strip().str.upper()
+            if 'Commercial' in cleaned.columns:
+                cleaned['Commercial'] = cleaned['Commercial'].astype(str).str.strip().str.title()
+            if 'Moteur' in cleaned.columns:
+                cleaned['Moteur'] = cleaned['Moteur'].astype(str).str.strip().str.title()
+            if 'Alternateur' in cleaned.columns:
+                cleaned['Alternateur'] = cleaned['Alternateur'].astype(str).str.strip().str.title()
+            if 'Statut' in cleaned.columns:
+                cleaned['Statut'] = cleaned['Statut'].astype(str).str.strip().str.title()
+
+            # 3. Numeric Anomaly Correction (Force Absolute Positive Values)
+            if 'Quantite' in cleaned.columns:
+                cleaned['Quantite'] = cleaned['Quantite'].fillna(0).abs().astype(int)
+            if 'Prix_Unitaire_MAD' in cleaned.columns:
+                cleaned['Prix_Unitaire_MAD'] = cleaned['Prix_Unitaire_MAD'].fillna(0.0).abs()
+            if 'Chiffre_Affaires_MAD' in cleaned.columns:
+                cleaned['Chiffre_Affaires_MAD'] = cleaned['Chiffre_Affaires_MAD'].fillna(0.0).abs()
+            if 'Cout_MAD' in cleaned.columns:
+                cleaned['Cout_MAD'] = cleaned['Cout_MAD'].fillna(0.0).abs()
+            if 'Jours_Livraison' in cleaned.columns:
+                cleaned['Jours_Livraison'] = cleaned['Jours_Livraison'].fillna(0).abs().astype(int)
+
+            # 4. Fill any remaining loose missing text values
+            for col in cleaned.columns:
+                if pd.api.types.is_object_dtype(cleaned[col]) or pd.api.types.is_string_dtype(cleaned[col]):
+                    cleaned[col] = cleaned[col].fillna("Non Spécifié").astype(str).str.strip()
                     
-            final_rows = len(df)
-            st.success(f"Nettoyage terminé ! {initial_rows - final_rows} doublons supprimés.")
-            st.session_state.cleaned_df = df
+            final_rows = len(cleaned)
+            st.success(f"Nettoyage avancé terminé ! Textes majuscules/minuscules harmonisés. {initial_rows - final_rows} doublons supprimés.")
+            st.session_state.cleaned_df = cleaned
 
     with col_export:
-        st.write("**Étape 2: Injection Base de Données**")
-        if st.button("🚀 Pousser vers MySQL"):
+        st.write("**Étape 2: Injection Intégrale Base de Données**")
+        if st.button("🚀 Pousser 100% des données vers MySQL"):
             if "cleaned_df" in st.session_state:
-                with st.spinner("Modélisation et injection dans les tables Dimensionnelles et Faits..."):
-                    if export_to_star_schema(st.session_state.cleaned_df):
-                        st.success("✅ Données injectées avec succès dans le Star Schema MySQL !")
+                with st.spinner("Modélisation et injection complète dans le Star Schema MySQL..."):
+                    rows_inserted = export_to_star_schema(st.session_state.cleaned_df)
+                    if rows_inserted > 0:
+                        st.success(f"✅ Succès ! {rows_inserted} lignes (100% du jeu de données) ont été injectées dans le Star Schema.")
             else:
-                st.warning("Veuillez d'abord nettoyer les données (Étape 1).")
+                st.warning("Veuillez d'abord exécuter le nettoyage (Étape 1).")
 
     st.divider()
-    st.subheader("Aperçu des Données (Avant Injection)")
-    preview_df = df.copy()
     
-    # Updated: Safe string conversion without triggering the Pandas 4 warning
+    # --- Data Preview ---
+    st.subheader("Aperçu des Données Prêtes pour l'Exportation")
+    if "cleaned_df" in st.session_state:
+        st.caption("🟢 Affichage du jeu de données **nettoyé et formaté**.")
+        preview_df = st.session_state.cleaned_df.copy()
+    else:
+        st.caption("🟡 Affichage du jeu de données **brut**.")
+        preview_df = df.copy()
+        
     for col in preview_df.columns:
          if pd.api.types.is_object_dtype(preview_df[col]) or pd.api.types.is_string_dtype(preview_df[col]):
             preview_df[col] = preview_df[col].astype(str)
