@@ -17,7 +17,7 @@ statuses = ['Livré', 'En cours', 'En attente', 'Annulé']
 
 # 2. Generate the Mock Data
 data = []
-num_rows = 500
+num_rows = 1000
 
 print(f"Generating {num_rows} rows of mock commercial data...")
 
