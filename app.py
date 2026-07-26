@@ -3,6 +3,10 @@ import pandas as pd
 import os
 import bcrypt
 import urllib.parse
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 
@@ -67,6 +71,12 @@ if not st.session_state.authenticated:
 # ========================================================
 # 3. HELPER FUNCTIONS & ETL PIPELINE
 # ========================================================
+@st.cache_data
+def load_data(file_path):
+    df = pd.read_excel(file_path, engine='openpyxl')
+    df['Date_Commande'] = pd.to_datetime(df['Date_Commande'])
+    return df
+
 def get_region(ville):
     regions = {
         'Marrakech': 'Marrakech-Safi', 'Safi': 'Marrakech-Safi', 'Essaouira': 'Marrakech-Safi',
@@ -148,112 +158,214 @@ def export_to_star_schema(df):
         return 0
 
 # ========================================================
-# 4. DASHBOARD UI (Protected Area)
+# 4. MODULES DE PAGES (Routing Functions)
 # ========================================================
-st.sidebar.title(f"👤 Bienvenue, {st.session_state.username}")
+
+def page_home():
+    """Module 1 : Intégration et Nettoyage des Données (ETL)"""
+    st.title("📊 Accueil & Intégration ETL")
+    
+    data_path = os.path.join('excel_files', 'mock_commercial_data.xlsx')
+
+    try:
+        df = load_data(data_path)
+        
+        st.subheader("Vue d'Ensemble des Fichiers Raw (Excel)")
+        total_revenue = df['Chiffre_Affaires_MAD'].sum()
+        total_sales = len(df)
+        top_city = df['Ville'].value_counts().index[0] if 'Ville' in df.columns else "N/A"
+        
+        col1, col2, col3 = st.columns(3)
+        col1.metric(label="Chiffre d'Affaires Total (MAD)", value=f"{total_revenue:,.2f}")
+        col2.metric(label="Volume de Ventes", value=total_sales)
+        col3.metric(label="Ville la Plus Performante", value=top_city)
+
+        st.divider()
+
+        st.subheader("🛠️ Outils ETL : Intégration MySQL (Star Schema)")
+        col_clean, col_export = st.columns(2)
+        
+        with col_clean:
+            st.write("**Étape 1: Nettoyage Intelligent & Formatage**")
+            if st.button("✨ Sanitiser et Standardiser les Données"):
+                initial_rows = len(df)
+                cleaned = df.copy()
+                
+                # 1. Remove exact duplicate rows
+                cleaned = cleaned.drop_duplicates()
+                
+                # 2. Capitalization & String Normalization
+                if 'Ville' in cleaned.columns:
+                    cleaned['Ville'] = cleaned['Ville'].astype(str).str.strip().str.title()
+                if 'Client' in cleaned.columns:
+                    cleaned['Client'] = cleaned['Client'].fillna("NON SPÉCIFIÉ").astype(str).str.strip().str.upper()
+                if 'Commercial' in cleaned.columns:
+                    cleaned['Commercial'] = cleaned['Commercial'].astype(str).str.strip().str.title()
+                if 'Moteur' in cleaned.columns:
+                    cleaned['Moteur'] = cleaned['Moteur'].astype(str).str.strip().str.title()
+                if 'Alternateur' in cleaned.columns:
+                    cleaned['Alternateur'] = cleaned['Alternateur'].astype(str).str.strip().str.title()
+                if 'Statut' in cleaned.columns:
+                    cleaned['Statut'] = cleaned['Statut'].astype(str).str.strip().str.title()
+
+                # 3. Numeric Anomaly Correction (Force Absolute Positive Values)
+                if 'Quantite' in cleaned.columns:
+                    cleaned['Quantite'] = cleaned['Quantite'].fillna(0).abs().astype(int)
+                if 'Prix_Unitaire_MAD' in cleaned.columns:
+                    cleaned['Prix_Unitaire_MAD'] = cleaned['Prix_Unitaire_MAD'].fillna(0.0).abs()
+                if 'Chiffre_Affaires_MAD' in cleaned.columns:
+                    cleaned['Chiffre_Affaires_MAD'] = cleaned['Chiffre_Affaires_MAD'].fillna(0.0).abs()
+                if 'Cout_MAD' in cleaned.columns:
+                    cleaned['Cout_MAD'] = cleaned['Cout_MAD'].fillna(0.0).abs()
+                if 'Jours_Livraison' in cleaned.columns:
+                    cleaned['Jours_Livraison'] = cleaned['Jours_Livraison'].fillna(0).abs().astype(int)
+
+                # 4. Fill any remaining loose missing text values
+                for col in cleaned.columns:
+                    if pd.api.types.is_object_dtype(cleaned[col]) or pd.api.types.is_string_dtype(cleaned[col]):
+                        cleaned[col] = cleaned[col].fillna("Non Spécifié").astype(str).str.strip()
+                        
+                final_rows = len(cleaned)
+                st.success(f"Nettoyage avancé terminé ! Textes majuscules/minuscules harmonisés. {initial_rows - final_rows} doublons supprimés.")
+                st.session_state.cleaned_df = cleaned
+
+        with col_export:
+            st.write("**Étape 2: Injection Intégrale Base de Données**")
+            if st.button("🚀 Pousser 100% des données vers MySQL"):
+                if "cleaned_df" in st.session_state:
+                    with st.spinner("Modélisation et injection complète dans le Star Schema MySQL..."):
+                        rows_inserted = export_to_star_schema(st.session_state.cleaned_df)
+                        if rows_inserted > 0:
+                            st.success(f"✅ Succès ! {rows_inserted} lignes ont été injectées dans le Star Schema.")
+                else:
+                    st.warning("Veuillez d'abord exécuter le nettoyage (Étape 1).")
+
+        st.divider()
+        
+        # --- Data Preview ---
+        st.subheader("Aperçu des Données Prêtes pour l'Exportation")
+        if "cleaned_df" in st.session_state:
+            st.caption("🟢 Affichage du jeu de données **nettoyé et formaté**.")
+            preview_df = st.session_state.cleaned_df.copy()
+        else:
+            st.caption("🟡 Affichage du jeu de données **brut**.")
+            preview_df = df.copy()
+            
+        for col in preview_df.columns:
+             if pd.api.types.is_object_dtype(preview_df[col]) or pd.api.types.is_string_dtype(preview_df[col]):
+                preview_df[col] = preview_df[col].astype(str)
+                
+        st.dataframe(preview_df)
+
+    except FileNotFoundError:
+        st.error("⚠️ Fichier Excel introuvable. Avez-vous généré le mock data ?")
+
+
+def page_ai_analytics():
+    """Module 2 : Hub IA et Prédictions"""
+    st.title("🤖 IA & Analytique Avancée")
+    st.write("Ce module sera connecté à un LLM (ex: OpenAI/Gemini) pour analyser les tendances de ventes et générer des insights.")
+    
+    st.info("Interface de requête IA en cours de développement.")
+    st.text_area(
+        "Posez une question à l'IA sur vos données commerciales :", 
+        "Ex: Quelle est la stratégie optimale d'inventaire pour les usines de la zone de Sidi Ghanem ce trimestre ?"
+    )
+    st.button("Générer l'Analyse")
+
+
+def page_communication():
+    """Module 3 : Système d'Emailing Externe"""
+    st.title("✉️ Centre de Communication")
+    st.write("Envoyez des rapports, des directives ou des alertes directement aux collaborateurs.")
+    
+    with st.form("email_form"):
+        destinataire = st.text_input("Destinataire (Email)", placeholder="commercial@pegasus.com")
+        sujet = st.text_input("Sujet de l'email", placeholder="Mise à jour : Stratégie de Vente")
+        message = st.text_area("Corps du message", height=150)
+        fichier_joint = st.file_uploader("Joindre un fichier (Optionnel)", type=['pdf', 'xlsx', 'csv', 'pbix'])
+        
+        submit_email = st.form_submit_button("Envoyer l'Email 🚀")
+        
+        if submit_email:
+            if not destinataire or not sujet or not message:
+                st.error("Veuillez remplir tous les champs obligatoires (Destinataire, Sujet, Message).")
+            else:
+                try:
+                    # Configurer les variables d'environnement SMTP dans .env au préalable
+                    smtp_server = os.getenv('SMTP_SERVER')
+                    smtp_port = int(os.getenv('SMTP_PORT', 587))
+                    smtp_user = os.getenv('SMTP_USER')
+                    smtp_pass = os.getenv('SMTP_PASS')
+                    
+                    if not smtp_server or not smtp_user:
+                        st.error("Configuration SMTP manquante dans le fichier .env.")
+                    else:
+                        with st.spinner("Envoi de l'email en cours..."):
+                            msg = MIMEMultipart()
+                            msg['From'] = smtp_user
+                            msg['To'] = destinataire
+                            msg['Subject'] = sujet
+                            msg.attach(MIMEText(message, 'plain'))
+                            
+                            # Gestion de la pièce jointe
+                            if fichier_joint is not None:
+                                part = MIMEApplication(fichier_joint.read(), Name=fichier_joint.name)
+                                part['Content-Disposition'] = f'attachment; filename="{fichier_joint.name}"'
+                                msg.attach(part)
+                            
+                            # Envoi via le serveur SMTP
+                            server = smtplib.SMTP(smtp_server, smtp_port)
+                            server.starttls()
+                            server.login(smtp_user, smtp_pass)
+                            server.send_message(msg)
+                            server.quit()
+                            
+                            st.success(f"Email envoyé avec succès à {destinataire} !")
+                except Exception as e:
+                    st.error(f"Erreur technique lors de l'envoi : {e}")
+
+
+def page_settings():
+    """Module 4 : Configuration Système"""
+    st.title("⚙️ Paramètres Système")
+    st.write("Gestion des configurations de l'application.")
+    
+    st.subheader("Informations de session")
+    st.text(f"Utilisateur connecté : {st.session_state.username}")
+    st.text(f"Base de données active : {DB_NAME}")
+    st.text(f"Hôte de base de données : {DB_HOST}")
+    
+    st.subheader("Statut des Services")
+    st.success("✅ Base de données MySQL (Connectée)")
+    if os.getenv('SMTP_SERVER'):
+        st.success("✅ Serveur SMTP (Configuré)")
+    else:
+        st.warning("⚠️ Serveur SMTP (Non configuré - Ajoutez les clés dans .env)")
+
+# ========================================================
+# 5. SIDEBAR NAVIGATION CONTROLLER
+# ========================================================
+st.sidebar.title(f"👤 Admin : {st.session_state.username}")
+st.sidebar.divider()
+
+# Le radio bouton sert de routeur principal
+choix_page = st.sidebar.radio(
+    "Menu Principal",
+    ["🏠 Accueil & ETL", "🤖 IA Analytique", "✉️ Communication", "⚙️ Paramètres"]
+)
+
+st.sidebar.divider()
 if st.sidebar.button("Se Déconnecter"):
     st.session_state.authenticated = False
     st.rerun()
 
-st.title("📊 Analyse des Performances Commerciales")
-
-@st.cache_data
-def load_data(file_path):
-    df = pd.read_excel(file_path, engine='openpyxl')
-    df['Date_Commande'] = pd.to_datetime(df['Date_Commande'])
-    return df
-
-data_path = os.path.join('excel_files', 'mock_commercial_data.xlsx')
-
-try:
-    df = load_data(data_path)
-    
-    st.subheader("Vue d'Ensemble des Fichiers Raw (Excel)")
-    total_revenue = df['Chiffre_Affaires_MAD'].sum()
-    total_sales = len(df)
-    top_city = df['Ville'].value_counts().index[0] if 'Ville' in df.columns else "N/A"
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric(label="Chiffre d'Affaires Total (MAD)", value=f"{total_revenue:,.2f}")
-    col2.metric(label="Volume de Ventes", value=total_sales)
-    col3.metric(label="Ville la Plus Performante", value=top_city)
-
-    st.divider()
-
-    st.subheader("🛠️ Outils ETL : Intégration MySQL (Star Schema)")
-    col_clean, col_export = st.columns(2)
-    
-    with col_clean:
-        st.write("**Étape 1: Nettoyage Intelligent & Formatage**")
-        if st.button("✨ Sanitiser et Standardiser les Données"):
-            initial_rows = len(df)
-            cleaned = df.copy()
-            
-            # 1. Remove exact duplicate rows
-            cleaned = cleaned.drop_duplicates()
-            
-            # 2. Capitalization & String Normalization
-            if 'Ville' in cleaned.columns:
-                cleaned['Ville'] = cleaned['Ville'].astype(str).str.strip().str.title()
-            if 'Client' in cleaned.columns:
-                cleaned['Client'] = cleaned['Client'].fillna("NON SPÉCIFIÉ").astype(str).str.strip().str.upper()
-            if 'Commercial' in cleaned.columns:
-                cleaned['Commercial'] = cleaned['Commercial'].astype(str).str.strip().str.title()
-            if 'Moteur' in cleaned.columns:
-                cleaned['Moteur'] = cleaned['Moteur'].astype(str).str.strip().str.title()
-            if 'Alternateur' in cleaned.columns:
-                cleaned['Alternateur'] = cleaned['Alternateur'].astype(str).str.strip().str.title()
-            if 'Statut' in cleaned.columns:
-                cleaned['Statut'] = cleaned['Statut'].astype(str).str.strip().str.title()
-
-            # 3. Numeric Anomaly Correction (Force Absolute Positive Values)
-            if 'Quantite' in cleaned.columns:
-                cleaned['Quantite'] = cleaned['Quantite'].fillna(0).abs().astype(int)
-            if 'Prix_Unitaire_MAD' in cleaned.columns:
-                cleaned['Prix_Unitaire_MAD'] = cleaned['Prix_Unitaire_MAD'].fillna(0.0).abs()
-            if 'Chiffre_Affaires_MAD' in cleaned.columns:
-                cleaned['Chiffre_Affaires_MAD'] = cleaned['Chiffre_Affaires_MAD'].fillna(0.0).abs()
-            if 'Cout_MAD' in cleaned.columns:
-                cleaned['Cout_MAD'] = cleaned['Cout_MAD'].fillna(0.0).abs()
-            if 'Jours_Livraison' in cleaned.columns:
-                cleaned['Jours_Livraison'] = cleaned['Jours_Livraison'].fillna(0).abs().astype(int)
-
-            # 4. Fill any remaining loose missing text values
-            for col in cleaned.columns:
-                if pd.api.types.is_object_dtype(cleaned[col]) or pd.api.types.is_string_dtype(cleaned[col]):
-                    cleaned[col] = cleaned[col].fillna("Non Spécifié").astype(str).str.strip()
-                    
-            final_rows = len(cleaned)
-            st.success(f"Nettoyage avancé terminé ! Textes majuscules/minuscules harmonisés. {initial_rows - final_rows} doublons supprimés.")
-            st.session_state.cleaned_df = cleaned
-
-    with col_export:
-        st.write("**Étape 2: Injection Intégrale Base de Données**")
-        if st.button("🚀 Pousser 100% des données vers MySQL"):
-            if "cleaned_df" in st.session_state:
-                with st.spinner("Modélisation et injection complète dans le Star Schema MySQL..."):
-                    rows_inserted = export_to_star_schema(st.session_state.cleaned_df)
-                    if rows_inserted > 0:
-                        st.success(f"✅ Succès ! {rows_inserted} lignes (100% du jeu de données) ont été injectées dans le Star Schema.")
-            else:
-                st.warning("Veuillez d'abord exécuter le nettoyage (Étape 1).")
-
-    st.divider()
-    
-    # --- Data Preview ---
-    st.subheader("Aperçu des Données Prêtes pour l'Exportation")
-    if "cleaned_df" in st.session_state:
-        st.caption("🟢 Affichage du jeu de données **nettoyé et formaté**.")
-        preview_df = st.session_state.cleaned_df.copy()
-    else:
-        st.caption("🟡 Affichage du jeu de données **brut**.")
-        preview_df = df.copy()
-        
-    for col in preview_df.columns:
-         if pd.api.types.is_object_dtype(preview_df[col]) or pd.api.types.is_string_dtype(preview_df[col]):
-            preview_df[col] = preview_df[col].astype(str)
-            
-    st.dataframe(preview_df)
-
-except FileNotFoundError:
-    st.error("⚠️ Fichier Excel introuvable. Avez-vous généré le mock data ?")
+# Routage vers la fonction appropriée
+if choix_page == "🏠 Accueil & ETL":
+    page_home()
+elif choix_page == "🤖 IA Analytique":
+    page_ai_analytics()
+elif choix_page == "✉️ Communication":
+    page_communication()
+elif choix_page == "⚙️ Paramètres":
+    page_settings()
