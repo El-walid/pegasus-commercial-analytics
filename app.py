@@ -9,6 +9,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
+from streamlit_option_menu import option_menu # <-- NEW IMPORT
 
 # ========================================================
 # 1. PAGE CONFIG & ENVIRONMENT SETUP
@@ -94,7 +95,6 @@ def get_puissance_cat(kva):
     else: return 'Très Haute Puissance'
 
 def export_to_star_schema(df):
-    """ETL Pipeline: Maps 100% of the flat sanitized data into the MySQL Star Schema"""
     try:
         with engine.connect() as conn:
             # --- 1. DIMENSION CLIENTS ---
@@ -146,10 +146,7 @@ def export_to_star_schema(df):
             
             fact_final = fact_df[cols_to_keep].rename(columns=str.lower)
             
-            # Insert into MySQL
             fact_final.to_sql('fact_ventes', conn, if_exists='append', index=False)
-            
-            # Save Transaction
             conn.commit()
             
         return len(fact_final)
@@ -162,7 +159,6 @@ def export_to_star_schema(df):
 # ========================================================
 
 def page_home():
-    """Module 1 : Intégration et Nettoyage des Données (ETL)"""
     st.title("📊 Accueil & Intégration ETL")
     
     data_path = os.path.join('excel_files', 'mock_commercial_data.xlsx')
@@ -191,10 +187,8 @@ def page_home():
                 initial_rows = len(df)
                 cleaned = df.copy()
                 
-                # 1. Remove exact duplicate rows
                 cleaned = cleaned.drop_duplicates()
                 
-                # 2. Capitalization & String Normalization
                 if 'Ville' in cleaned.columns:
                     cleaned['Ville'] = cleaned['Ville'].astype(str).str.strip().str.title()
                 if 'Client' in cleaned.columns:
@@ -208,7 +202,6 @@ def page_home():
                 if 'Statut' in cleaned.columns:
                     cleaned['Statut'] = cleaned['Statut'].astype(str).str.strip().str.title()
 
-                # 3. Numeric Anomaly Correction (Force Absolute Positive Values)
                 if 'Quantite' in cleaned.columns:
                     cleaned['Quantite'] = cleaned['Quantite'].fillna(0).abs().astype(int)
                 if 'Prix_Unitaire_MAD' in cleaned.columns:
@@ -220,7 +213,6 @@ def page_home():
                 if 'Jours_Livraison' in cleaned.columns:
                     cleaned['Jours_Livraison'] = cleaned['Jours_Livraison'].fillna(0).abs().astype(int)
 
-                # 4. Fill any remaining loose missing text values
                 for col in cleaned.columns:
                     if pd.api.types.is_object_dtype(cleaned[col]) or pd.api.types.is_string_dtype(cleaned[col]):
                         cleaned[col] = cleaned[col].fillna("Non Spécifié").astype(str).str.strip()
@@ -242,7 +234,6 @@ def page_home():
 
         st.divider()
         
-        # --- Data Preview ---
         st.subheader("Aperçu des Données Prêtes pour l'Exportation")
         if "cleaned_df" in st.session_state:
             st.caption("🟢 Affichage du jeu de données **nettoyé et formaté**.")
@@ -262,10 +253,8 @@ def page_home():
 
 
 def page_ai_analytics():
-    """Module 2 : Hub IA et Prédictions"""
     st.title("🤖 IA & Analytique Avancée")
     st.write("Ce module sera connecté à un LLM (ex: OpenAI/Gemini) pour analyser les tendances de ventes et générer des insights.")
-    
     st.info("Interface de requête IA en cours de développement.")
     st.text_area(
         "Posez une question à l'IA sur vos données commerciales :", 
@@ -275,7 +264,6 @@ def page_ai_analytics():
 
 
 def page_communication():
-    """Module 3 : Système d'Emailing Externe"""
     st.title("✉️ Centre de Communication")
     st.write("Envoyez des rapports, des directives ou des alertes directement aux collaborateurs.")
     
@@ -292,7 +280,6 @@ def page_communication():
                 st.error("Veuillez remplir tous les champs obligatoires (Destinataire, Sujet, Message).")
             else:
                 try:
-                    # Configurer les variables d'environnement SMTP dans .env au préalable
                     smtp_server = os.getenv('SMTP_SERVER')
                     smtp_port = int(os.getenv('SMTP_PORT', 587))
                     smtp_user = os.getenv('SMTP_USER')
@@ -308,13 +295,11 @@ def page_communication():
                             msg['Subject'] = sujet
                             msg.attach(MIMEText(message, 'plain'))
                             
-                            # Gestion de la pièce jointe
                             if fichier_joint is not None:
                                 part = MIMEApplication(fichier_joint.read(), Name=fichier_joint.name)
                                 part['Content-Disposition'] = f'attachment; filename="{fichier_joint.name}"'
                                 msg.attach(part)
                             
-                            # Envoi via le serveur SMTP
                             server = smtplib.SMTP(smtp_server, smtp_port)
                             server.starttls()
                             server.login(smtp_user, smtp_pass)
@@ -327,7 +312,6 @@ def page_communication():
 
 
 def page_settings():
-    """Module 4 : Configuration Système"""
     st.title("⚙️ Paramètres Système")
     st.write("Gestion des configurations de l'application.")
     
@@ -343,29 +327,47 @@ def page_settings():
     else:
         st.warning("⚠️ Serveur SMTP (Non configuré - Ajoutez les clés dans .env)")
 
+
 # ========================================================
-# 5. SIDEBAR NAVIGATION CONTROLLER
+# 5. SIDEBAR NAVIGATION CONTROLLER (UPGRADED UI)
 # ========================================================
-st.sidebar.title(f"👤 Admin : {st.session_state.username}")
-st.sidebar.divider()
+with st.sidebar:
+    st.markdown(f"### 👤 Admin : {st.session_state.username}")
+    st.divider()
 
-# Le radio bouton sert de routeur principal
-choix_page = st.sidebar.radio(
-    "Menu Principal",
-    ["🏠 Accueil & ETL", "🤖 IA Analytique", "✉️ Communication", "⚙️ Paramètres"]
-)
+    # The new option_menu replacing the radio buttons
+    choix_page = option_menu(
+        menu_title=None,  # Hidden title since we have the header above
+        options=["Accueil & ETL", "IA Analytique", "Communication", "Paramètres"],
+        icons=["house", "robot", "envelope", "gear"], # Bootstrap icons
+        menu_icon="cast", 
+        default_index=0,
+        styles={
+            "container": {"padding": "0!important", "background-color": "transparent"},
+            "icon": {"color": "#A6B8E1", "font-size": "18px"}, 
+            "nav-link": {
+                "font-size": "15px", 
+                "text-align": "left", 
+                "margin": "0px", 
+                "border-radius": "8px",
+                "--hover-color": "#333333" if st.get_option("theme.base") == "dark" else "#526b9e"
+            },
+            "nav-link-selected": {"background-color": "#004CFF", "color": "white"},
+        }
+    )
 
-st.sidebar.divider()
-if st.sidebar.button("Se Déconnecter"):
-    st.session_state.authenticated = False
-    st.rerun()
+    st.divider()
+    # use_container_width makes the logout button span the full width of the sidebar
+    if st.button("Se Déconnecter", use_container_width=True):
+        st.session_state.authenticated = False
+        st.rerun()
 
-# Routage vers la fonction appropriée
-if choix_page == "🏠 Accueil & ETL":
+# Routing Logic
+if choix_page == "Accueil & ETL":
     page_home()
-elif choix_page == "🤖 IA Analytique":
+elif choix_page == "IA Analytique":
     page_ai_analytics()
-elif choix_page == "✉️ Communication":
+elif choix_page == "Communication":
     page_communication()
-elif choix_page == "⚙️ Paramètres":
+elif choix_page == "Paramètres":
     page_settings()
