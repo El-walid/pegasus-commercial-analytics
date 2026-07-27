@@ -377,15 +377,15 @@ with st.sidebar:
         default_index=0,
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
-            "icon": {"color": "#4C83FF", "font-size": "18px"}, 
+            "icon": {"color": "#AFC7FF", "font-size": "18px"}, 
             "nav-link": {
                 "font-size": "15px", 
                 "text-align": "left", 
                 "margin": "0px", 
                 "border-radius": "8px",
-                "--hover-color": "#333333" if st.get_option("theme.base") == "dark" else "#f0f2f6"
+                "--hover-color": "#333333" if st.get_option("theme.base") == "dark" else "#327ebc"
             },
-            "nav-link-selected": {"background-color": "#4C83FF", "color": "white"},
+            "nav-link-selected": {"background-color": "#0066b9", "color": "white"},
         }
     )
 
