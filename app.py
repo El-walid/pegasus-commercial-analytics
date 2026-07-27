@@ -4,12 +4,14 @@ import os
 import bcrypt
 import urllib.parse
 import smtplib
+import sqlite3
+import tempfile
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
-from streamlit_option_menu import option_menu # <-- NEW IMPORT
+from streamlit_option_menu import option_menu
 
 # ========================================================
 # 1. PAGE CONFIG & ENVIRONMENT SETUP
@@ -23,10 +25,7 @@ DB_HOST = os.getenv('DB_HOST', 'localhost')
 DB_PORT = os.getenv('DB_PORT', '3307')
 DB_NAME = os.getenv('DB_NAME', 'pegasus_db')
 
-# Safely encode the password to handle special characters like '@'
 safe_password = urllib.parse.quote_plus(DB_PASS)
-
-# Create SQLAlchemy Engine
 engine = create_engine(f"mysql+pymysql://{DB_USER}:{safe_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
 
 # ========================================================
@@ -72,12 +71,6 @@ if not st.session_state.authenticated:
 # ========================================================
 # 3. HELPER FUNCTIONS & ETL PIPELINE
 # ========================================================
-@st.cache_data
-def load_data(file_path):
-    df = pd.read_excel(file_path, engine='openpyxl')
-    df['Date_Commande'] = pd.to_datetime(df['Date_Commande'])
-    return df
-
 def get_region(ville):
     regions = {
         'Marrakech': 'Marrakech-Safi', 'Safi': 'Marrakech-Safi', 'Essaouira': 'Marrakech-Safi',
@@ -97,7 +90,7 @@ def get_puissance_cat(kva):
 def export_to_star_schema(df):
     try:
         with engine.connect() as conn:
-            # --- 1. DIMENSION CLIENTS ---
+            # 1. DIMENSION CLIENTS
             new_clients = df[['Client']].drop_duplicates().rename(columns={'Client': 'nom_client'})
             existing_clients = pd.read_sql("SELECT nom_client FROM dim_clients", conn)
             missing_clients = new_clients[~new_clients['nom_client'].isin(existing_clients['nom_client'])]
@@ -105,7 +98,7 @@ def export_to_star_schema(df):
                 missing_clients.to_sql('dim_clients', conn, if_exists='append', index=False)
             dim_clients = pd.read_sql("SELECT id_client, nom_client as Client FROM dim_clients", conn)
 
-            # --- 2. DIMENSION COMMERCIAUX ---
+            # 2. DIMENSION COMMERCIAUX
             new_comms = df[['Commercial']].drop_duplicates().rename(columns={'Commercial': 'nom_commercial'})
             existing_comms = pd.read_sql("SELECT nom_commercial FROM dim_commerciaux", conn)
             missing_comms = new_comms[~new_comms['nom_commercial'].isin(existing_comms['nom_commercial'])]
@@ -113,7 +106,7 @@ def export_to_star_schema(df):
                 missing_comms.to_sql('dim_commerciaux', conn, if_exists='append', index=False)
             dim_commerciaux = pd.read_sql("SELECT id_commercial, nom_commercial as Commercial FROM dim_commerciaux", conn)
 
-            # --- 3. DIMENSION LOCALISATIONS ---
+            # 3. DIMENSION LOCALISATIONS
             new_locs = df[['Ville']].drop_duplicates()
             new_locs['region'] = new_locs['Ville'].apply(get_region)
             new_locs.rename(columns={'Ville': 'ville'}, inplace=True)
@@ -123,7 +116,7 @@ def export_to_star_schema(df):
                 missing_locs.to_sql('dim_localisations', conn, if_exists='append', index=False)
             dim_locs = pd.read_sql("SELECT id_localisation, ville as Ville FROM dim_localisations", conn)
 
-            # --- 4. DIMENSION PRODUITS ---
+            # 4. DIMENSION PRODUITS
             new_prods = df[['Moteur', 'Alternateur', 'Puissance_kVA']].drop_duplicates()
             new_prods['categorie_puissance'] = new_prods['Puissance_kVA'].apply(get_puissance_cat)
             new_prods.rename(columns={'Moteur': 'moteur', 'Alternateur': 'alternateur', 'Puissance_kVA': 'puissance_kva'}, inplace=True)
@@ -135,7 +128,7 @@ def export_to_star_schema(df):
                 missing_prods.to_sql('dim_produits', conn, if_exists='append', index=False)
             dim_prods = pd.read_sql("SELECT id_produit, moteur as Moteur, alternateur as Alternateur, puissance_kva as Puissance_kVA FROM dim_produits", conn)
 
-            # --- 5. FACT VENTES (MERGE IDs) ---
+            # 5. FACT VENTES (MERGE IDs)
             fact_df = df.merge(dim_clients, on='Client', how='left')
             fact_df = fact_df.merge(dim_commerciaux, on='Commercial', how='left')
             fact_df = fact_df.merge(dim_locs, on='Ville', how='left')
@@ -145,7 +138,6 @@ def export_to_star_schema(df):
                             'Statut', 'Jours_Livraison', 'Quantite', 'Prix_Unitaire_MAD', 'Chiffre_Affaires_MAD', 'Cout_MAD']
             
             fact_final = fact_df[cols_to_keep].rename(columns=str.lower)
-            
             fact_final.to_sql('fact_ventes', conn, if_exists='append', index=False)
             conn.commit()
             
@@ -154,103 +146,148 @@ def export_to_star_schema(df):
         st.error(f"Erreur lors de l'exportation: {e}")
         return 0
 
+def generate_sqlite_db(dataframe):
+    """Generates an SQLite database file in memory for download."""
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as tmp:
+        tmp_path = tmp.name
+    
+    conn = sqlite3.connect(tmp_path)
+    dataframe.to_sql("ventes_nettoyees", conn, index=False, if_exists="replace")
+    conn.close()
+    
+    with open(tmp_path, "rb") as f:
+        db_bytes = f.read()
+        
+    if os.path.exists(tmp_path):
+        os.remove(tmp_path)
+        
+    return db_bytes
+
 # ========================================================
 # 4. MODULES DE PAGES (Routing Functions)
 # ========================================================
 
 def page_home():
-    st.title("📊 Accueil & Intégration ETL")
+    st.title("📊 Accueil & Hub d'Intégration (ETL)")
     
-    data_path = os.path.join('excel_files', 'mock_commercial_data.xlsx')
-
-    try:
-        df = load_data(data_path)
-        
-        st.subheader("Vue d'Ensemble des Fichiers Raw (Excel)")
-        total_revenue = df['Chiffre_Affaires_MAD'].sum()
-        total_sales = len(df)
-        top_city = df['Ville'].value_counts().index[0] if 'Ville' in df.columns else "N/A"
-        
-        col1, col2, col3 = st.columns(3)
-        col1.metric(label="Chiffre d'Affaires Total (MAD)", value=f"{total_revenue:,.2f}")
-        col2.metric(label="Volume de Ventes", value=total_sales)
-        col3.metric(label="Ville la Plus Performante", value=top_city)
-
-        st.divider()
-
-        st.subheader("🛠️ Outils ETL : Intégration MySQL (Star Schema)")
-        col_clean, col_export = st.columns(2)
-        
-        with col_clean:
-            st.write("**Étape 1: Nettoyage Intelligent & Formatage**")
-            if st.button("✨ Sanitiser et Standardiser les Données"):
-                initial_rows = len(df)
-                cleaned = df.copy()
-                
-                cleaned = cleaned.drop_duplicates()
-                
-                if 'Ville' in cleaned.columns:
-                    cleaned['Ville'] = cleaned['Ville'].astype(str).str.strip().str.title()
-                if 'Client' in cleaned.columns:
-                    cleaned['Client'] = cleaned['Client'].fillna("NON SPÉCIFIÉ").astype(str).str.strip().str.upper()
-                if 'Commercial' in cleaned.columns:
-                    cleaned['Commercial'] = cleaned['Commercial'].astype(str).str.strip().str.title()
-                if 'Moteur' in cleaned.columns:
-                    cleaned['Moteur'] = cleaned['Moteur'].astype(str).str.strip().str.title()
-                if 'Alternateur' in cleaned.columns:
-                    cleaned['Alternateur'] = cleaned['Alternateur'].astype(str).str.strip().str.title()
-                if 'Statut' in cleaned.columns:
-                    cleaned['Statut'] = cleaned['Statut'].astype(str).str.strip().str.title()
-
-                if 'Quantite' in cleaned.columns:
-                    cleaned['Quantite'] = cleaned['Quantite'].fillna(0).abs().astype(int)
-                if 'Prix_Unitaire_MAD' in cleaned.columns:
-                    cleaned['Prix_Unitaire_MAD'] = cleaned['Prix_Unitaire_MAD'].fillna(0.0).abs()
-                if 'Chiffre_Affaires_MAD' in cleaned.columns:
-                    cleaned['Chiffre_Affaires_MAD'] = cleaned['Chiffre_Affaires_MAD'].fillna(0.0).abs()
-                if 'Cout_MAD' in cleaned.columns:
-                    cleaned['Cout_MAD'] = cleaned['Cout_MAD'].fillna(0.0).abs()
-                if 'Jours_Livraison' in cleaned.columns:
-                    cleaned['Jours_Livraison'] = cleaned['Jours_Livraison'].fillna(0).abs().astype(int)
-
-                for col in cleaned.columns:
-                    if pd.api.types.is_object_dtype(cleaned[col]) or pd.api.types.is_string_dtype(cleaned[col]):
-                        cleaned[col] = cleaned[col].fillna("Non Spécifié").astype(str).str.strip()
-                        
-                final_rows = len(cleaned)
-                st.success(f"Nettoyage avancé terminé ! Textes majuscules/minuscules harmonisés. {initial_rows - final_rows} doublons supprimés.")
-                st.session_state.cleaned_df = cleaned
-
-        with col_export:
-            st.write("**Étape 2: Injection Intégrale Base de Données**")
-            if st.button("🚀 Pousser 100% des données vers MySQL"):
-                if "cleaned_df" in st.session_state:
-                    with st.spinner("Modélisation et injection complète dans le Star Schema MySQL..."):
-                        rows_inserted = export_to_star_schema(st.session_state.cleaned_df)
-                        if rows_inserted > 0:
-                            st.success(f"✅ Succès ! {rows_inserted} lignes ont été injectées dans le Star Schema.")
-                else:
-                    st.warning("Veuillez d'abord exécuter le nettoyage (Étape 1).")
-
-        st.divider()
-        
-        st.subheader("Aperçu des Données Prêtes pour l'Exportation")
-        if "cleaned_df" in st.session_state:
-            st.caption("🟢 Affichage du jeu de données **nettoyé et formaté**.")
-            preview_df = st.session_state.cleaned_df.copy()
-        else:
-            st.caption("🟡 Affichage du jeu de données **brut**.")
-            preview_df = df.copy()
+    st.write("Importez vos rapports de ventes Excel pour les nettoyer, les normaliser et les injecter dans la base de données principale.")
+    
+    uploaded_file = st.file_uploader("📂 Importer un fichier Excel", type=['xlsx', 'xls'])
+    
+    if uploaded_file is not None:
+        try:
+            df = pd.read_excel(uploaded_file, engine='openpyxl')
+            if 'Date_Commande' in df.columns:
+                df['Date_Commande'] = pd.to_datetime(df['Date_Commande'])
             
-        for col in preview_df.columns:
-             if pd.api.types.is_object_dtype(preview_df[col]) or pd.api.types.is_string_dtype(preview_df[col]):
-                preview_df[col] = preview_df[col].astype(str)
+            st.success("Fichier importé avec succès !")
+            st.divider()
+
+            st.subheader("Vue d'Ensemble des Données Brutes")
+            
+            total_revenue = df['Chiffre_Affaires_MAD'].sum() if 'Chiffre_Affaires_MAD' in df.columns else 0
+            total_sales = len(df)
+            top_city = df['Ville'].value_counts().index[0] if 'Ville' in df.columns else "N/A"
+            
+            col1, col2, col3 = st.columns(3)
+            col1.metric(label="Chiffre d'Affaires Total (MAD)", value=f"{total_revenue:,.2f}")
+            col2.metric(label="Volume de Lignes", value=total_sales)
+            col3.metric(label="Ville Principale", value=top_city)
+
+            st.divider()
+
+            st.subheader("🛠️ Outils de Traitement & Exportation")
+            
+            # Reset cleaned_df if a new file is uploaded
+            if "last_uploaded_file" not in st.session_state or st.session_state.last_uploaded_file != uploaded_file.name:
+                if "cleaned_df" in st.session_state:
+                    del st.session_state["cleaned_df"]
+                st.session_state.last_uploaded_file = uploaded_file.name
+
+            col_clean, col_mysql, col_download = st.columns(3)
+            
+            with col_clean:
+                st.write("**1. Nettoyage Intelligent**")
+                if st.button("✨ Sanitiser les Données", use_container_width=True):
+                    initial_rows = len(df)
+                    cleaned = df.copy()
+                    cleaned = cleaned.drop_duplicates()
+                    
+                    if 'Ville' in cleaned.columns:
+                        cleaned['Ville'] = cleaned['Ville'].astype(str).str.strip().str.title()
+                    if 'Client' in cleaned.columns:
+                        cleaned['Client'] = cleaned['Client'].fillna("NON SPÉCIFIÉ").astype(str).str.strip().str.upper()
+                    if 'Commercial' in cleaned.columns:
+                        cleaned['Commercial'] = cleaned['Commercial'].astype(str).str.strip().str.title()
+                    if 'Moteur' in cleaned.columns:
+                        cleaned['Moteur'] = cleaned['Moteur'].astype(str).str.strip().str.title()
+                    if 'Alternateur' in cleaned.columns:
+                        cleaned['Alternateur'] = cleaned['Alternateur'].astype(str).str.strip().str.title()
+                    if 'Statut' in cleaned.columns:
+                        cleaned['Statut'] = cleaned['Statut'].astype(str).str.strip().str.title()
+
+                    numeric_cols = ['Quantite', 'Prix_Unitaire_MAD', 'Chiffre_Affaires_MAD', 'Cout_MAD', 'Jours_Livraison']
+                    for col in numeric_cols:
+                        if col in cleaned.columns:
+                            cleaned[col] = cleaned[col].fillna(0).abs()
+                    if 'Quantite' in cleaned.columns:
+                        cleaned['Quantite'] = cleaned['Quantite'].astype(int)
+                    if 'Jours_Livraison' in cleaned.columns:
+                        cleaned['Jours_Livraison'] = cleaned['Jours_Livraison'].astype(int)
+
+                    for col in cleaned.columns:
+                        if pd.api.types.is_object_dtype(cleaned[col]) or pd.api.types.is_string_dtype(cleaned[col]):
+                            cleaned[col] = cleaned[col].fillna("Non Spécifié").astype(str).str.strip()
+                            
+                    final_rows = len(cleaned)
+                    st.session_state.cleaned_df = cleaned
+                    st.success(f"Nettoyé ! {initial_rows - final_rows} doublons supprimés.")
+
+            with col_mysql:
+                st.write("**2. Déploiement Serveur**")
+                if st.button("🚀 Pousser vers MySQL", use_container_width=True):
+                    if "cleaned_df" in st.session_state:
+                        with st.spinner("Injection dans le Star Schema MySQL..."):
+                            rows_inserted = export_to_star_schema(st.session_state.cleaned_df)
+                            if rows_inserted > 0:
+                                st.success(f"✅ {rows_inserted} lignes injectées !")
+                    else:
+                        st.warning("Veuillez d'abord exécuter le nettoyage.")
+
+            with col_download:
+                st.write("**3. Téléchargement Local**")
+                if "cleaned_df" in st.session_state:
+                    db_data = generate_sqlite_db(st.session_state.cleaned_df)
+                    st.download_button(
+                        label="📥 Télécharger en SQL (.db)",
+                        data=db_data,
+                        file_name="donnees_commerciales_pegasus.db",
+                        mime="application/x-sqlite3",
+                        use_container_width=True
+                    )
+                else:
+                    st.info("Nettoyez d'abord pour activer l'export local.")
+
+            st.divider()
+            
+            st.subheader("Aperçu des Données")
+            if "cleaned_df" in st.session_state:
+                st.caption("🟢 Affichage du jeu de données **nettoyé et formaté**.")
+                preview_df = st.session_state.cleaned_df.copy()
+            else:
+                st.caption("🟡 Affichage du jeu de données **brut**.")
+                preview_df = df.copy()
                 
-        st.dataframe(preview_df)
-
-    except FileNotFoundError:
-        st.error("⚠️ Fichier Excel introuvable. Avez-vous généré le mock data ?")
-
+            for col in preview_df.columns:
+                if pd.api.types.is_object_dtype(preview_df[col]) or pd.api.types.is_string_dtype(preview_df[col]):
+                    preview_df[col] = preview_df[col].astype(str)
+                    
+            st.dataframe(preview_df)
+            
+        except Exception as e:
+            st.error(f"Erreur lors de la lecture du fichier : {e}")
+    else:
+        st.info("En attente de fichier... Importez un fichier Excel pour activer les modules d'analyse.")
 
 def page_ai_analytics():
     st.title("🤖 IA & Analytique Avancée")
@@ -258,10 +295,9 @@ def page_ai_analytics():
     st.info("Interface de requête IA en cours de développement.")
     st.text_area(
         "Posez une question à l'IA sur vos données commerciales :", 
-        "Ex: Quelle est la stratégie optimale d'inventaire pour les usines de la zone de Sidi Ghanem ce trimestre ?"
+        "Ex: Quelle est la stratégie optimale d'inventaire pour ce trimestre ?"
     )
     st.button("Générer l'Analyse")
-
 
 def page_communication():
     st.title("✉️ Centre de Communication")
@@ -271,7 +307,7 @@ def page_communication():
         destinataire = st.text_input("Destinataire (Email)", placeholder="commercial@pegasus.com")
         sujet = st.text_input("Sujet de l'email", placeholder="Mise à jour : Stratégie de Vente")
         message = st.text_area("Corps du message", height=150)
-        fichier_joint = st.file_uploader("Joindre un fichier (Optionnel)", type=['pdf', 'xlsx', 'csv', 'pbix'])
+        fichier_joint = st.file_uploader("Joindre un fichier (Optionnel)", type=['pdf', 'xlsx', 'csv', 'pbix', 'db'])
         
         submit_email = st.form_submit_button("Envoyer l'Email 🚀")
         
@@ -310,7 +346,6 @@ def page_communication():
                 except Exception as e:
                     st.error(f"Erreur technique lors de l'envoi : {e}")
 
-
 def page_settings():
     st.title("⚙️ Paramètres Système")
     st.write("Gestion des configurations de l'application.")
@@ -327,7 +362,6 @@ def page_settings():
     else:
         st.warning("⚠️ Serveur SMTP (Non configuré - Ajoutez les clés dans .env)")
 
-
 # ========================================================
 # 5. SIDEBAR NAVIGATION CONTROLLER (UPGRADED UI)
 # ========================================================
@@ -335,34 +369,31 @@ with st.sidebar:
     st.markdown(f"### 👤 Admin : {st.session_state.username}")
     st.divider()
 
-    # The new option_menu replacing the radio buttons
     choix_page = option_menu(
-        menu_title=None,  # Hidden title since we have the header above
+        menu_title=None,
         options=["Accueil & ETL", "IA Analytique", "Communication", "Paramètres"],
-        icons=["house", "robot", "envelope", "gear"], # Bootstrap icons
+        icons=["cloud-upload", "robot", "envelope", "gear"], 
         menu_icon="cast", 
         default_index=0,
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
-            "icon": {"color": "#A6B8E1", "font-size": "18px"}, 
+            "icon": {"color": "#4C83FF", "font-size": "18px"}, 
             "nav-link": {
                 "font-size": "15px", 
                 "text-align": "left", 
                 "margin": "0px", 
                 "border-radius": "8px",
-                "--hover-color": "#333333" if st.get_option("theme.base") == "dark" else "#526b9e"
+                "--hover-color": "#333333" if st.get_option("theme.base") == "dark" else "#f0f2f6"
             },
-            "nav-link-selected": {"background-color": "#004CFF", "color": "white"},
+            "nav-link-selected": {"background-color": "#4C83FF", "color": "white"},
         }
     )
 
     st.divider()
-    # use_container_width makes the logout button span the full width of the sidebar
     if st.button("Se Déconnecter", use_container_width=True):
         st.session_state.authenticated = False
         st.rerun()
 
-# Routing Logic
 if choix_page == "Accueil & ETL":
     page_home()
 elif choix_page == "IA Analytique":
