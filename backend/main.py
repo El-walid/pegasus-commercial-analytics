@@ -26,7 +26,7 @@ load_dotenv(env_path)
 DB_USER = os.getenv('DB_USER', 'root')
 DB_PASS = os.getenv('DB_PASS', 'Elwalid1010@@')
 DB_HOST = os.getenv('DB_HOST', '172.22.160.1') 
-DB_PORT = os.getenv('DB_PORT', '3307')
+DB_PORT = os.getenv('DB_PORT', '3307') 
 DB_NAME = os.getenv('DB_NAME', 'pegasus_db')
 
 safe_password = urllib.parse.quote_plus(DB_PASS)

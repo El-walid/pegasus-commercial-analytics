@@ -1,21 +1,38 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import DataHub from './pages/DataHub';
 
-//Check if the token exists in localStorage
-const isAuthenticated = !!localStorage.getItem('pegasus_token');
+// Composant de protection dynamique
+const ProtectedRoute = ({ children }) => {
+  const isAuthenticated = !!localStorage.getItem('pegasus_token');
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
+};
 
 function App() {
   return (
     <Router>
       <Routes>
-        {/* Public Route */}
+        {/* Route Publique */}
         <Route path="/login" element={<Login />} />
 
-        {/* Protected Routes */}
+        {/* Routes Protégées */}
         <Route 
           path="/" 
-          element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} 
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/datahub" 
+          element={
+            <ProtectedRoute>
+              <DataHub />
+            </ProtectedRoute>
+          } 
         />
         
         {/* Catch-all redirect */}
