@@ -218,33 +218,60 @@ app.get('/api/kpis', async (req, res) => {
     }
 });
 
-
-// Endpoint: Top Clients (Avec filtrage dynamique par Division)
+// ==========================================
+// 1. UPDATED TOP CLIENTS (Supports Cross-Filtering)
+// ==========================================
 app.get('/api/top-clients', async (req, res) => {
     try {
-        const division = req.query.division;
-        const whereClause = division ? 'WHERE c.division = ?' : '';
-        const params = division ? [division] : [];
+        const { division, commercial } = req.query;
+        let query = `
+            SELECT c.code_client, c.nom_client, COUNT(DISTINCT f.numero_fac) as nb_commandes, SUM(f.total_ht) as ca_total
+            FROM dim_clients c
+            JOIN fact_factures_entetes f ON c.code_client = f.code_client
+            JOIN dim_commerciaux com ON f.id_commercial = com.id_commercial
+            WHERE 1=1
+        `;
+        const queryParams = [];
 
-        // Récupère le Top 5 des clients (basé sur le CA généré)
-        const [rows] = await pool.execute(`
-            SELECT 
-                cl.code_client, 
-                cl.nom_client, 
-                COUNT(DISTINCT f.numero_fac) as nb_commandes, 
-                SUM(f.total_ht) as ca_total
-            FROM fact_factures_entetes f
-            JOIN dim_clients cl ON f.code_client = cl.code_client
-            JOIN dim_commerciaux c ON f.id_commercial = c.id_commercial
-            ${whereClause}
-            GROUP BY cl.code_client, cl.nom_client
-            ORDER BY ca_total DESC
-            LIMIT 30
-        `, params);
+        // Apply filters dynamically if they exist
+        if (division) {
+            query += ` AND com.division = ?`;
+            queryParams.push(division);
+        }
+        if (commercial) {
+            query += ` AND com.nom_commercial = ?`;
+            queryParams.push(commercial);
+        }
 
+        query += ` GROUP BY c.code_client, c.nom_client ORDER BY ca_total DESC LIMIT 10`;
+
+        const [rows] = await pool.execute(query, queryParams);
         res.json(rows);
     } catch (error) {
         console.error("Erreur Top Clients:", error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// ==========================================
+// 2. NEW: YEAR OVER YEAR (YoY) COMPARISON
+// ==========================================
+app.get('/api/ca-yoy', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                MONTH(date_facture) as mois,
+                SUM(CASE WHEN YEAR(date_facture) = YEAR(CURDATE()) THEN total_ht ELSE 0 END) as ca_current,
+                SUM(CASE WHEN YEAR(date_facture) = YEAR(CURDATE()) - 1 THEN total_ht ELSE 0 END) as ca_previous
+            FROM fact_factures_entetes
+            WHERE YEAR(date_facture) IN (YEAR(CURDATE()), YEAR(CURDATE()) - 1)
+            GROUP BY mois
+            ORDER BY mois ASC
+        `;
+        const [rows] = await pool.execute(query);
+        res.json(rows);
+    } catch (error) {
+        console.error("Erreur YoY:", error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
