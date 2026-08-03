@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useNavigate,link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import * as Highcharts from 'highcharts';
 import HighchartsReactWrapper from 'highcharts-react-official';
 import { LayoutDashboard, Database, Bot, Settings, LogOut, TrendingUp, Users, Target, Award, Briefcase, Package, FileText, ShoppingCart, Menu, Sun, Moon } from 'lucide-react';
@@ -12,7 +12,9 @@ export default function Dashboard() {
   
   // Nouveaux états pour l'UI
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem('pegasus_theme') === 'dark';
+  });
 
   // États existants pour les données
   const [chartOptions, setChartOptions] = useState(null);
@@ -25,8 +27,10 @@ export default function Dashboard() {
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
+      localStorage.setItem('pegasus_theme', 'dark');
     } else {
       document.documentElement.classList.remove('dark');
+      localStorage.setItem('pegasus_theme', 'light');
     }
   }, [isDarkMode]);
 

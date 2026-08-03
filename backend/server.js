@@ -1,11 +1,12 @@
 const express = require('express');
-const mysql = require('mysql2/promise');
 const cors = require('cors');
+const mysql = require('mysql2/promise');
 require('dotenv').config({ path: '../.env' });
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Route par défaut
 app.get('/', (req, res) => {
@@ -263,6 +264,156 @@ app.get('/api/repartition-division', async (req, res) => {
     } catch (error) {
         console.error("Erreur Pie Chart:", error);
         res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Endpoint: Data Hub System Status
+app.get('/api/system-status', async (req, res) => {
+    try {
+        // 1. Check total records to ensure DB is populated
+        const [records] = await pool.execute('SELECT COUNT(*) as total FROM fact_factures_entetes');
+        
+        // 2. Get the date of the most recent invoice (Simulates last sync)
+        const [lastSync] = await pool.execute('SELECT MAX(date_facture) as last_date FROM fact_factures_entetes');
+        
+        res.json({
+            status: "Online",
+            total_invoices: records[0].total,
+            last_sync: lastSync[0].last_date || "N/A",
+            anomalies: 0 
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Database Connection Failed' });
+    }
+});
+
+
+// Endpoint: Sync Clients from Excel to DB
+app.post('/api/sync-clients', async (req, res) => {
+    try {
+        const { data } = req.body;
+
+        if (!data || data.length === 0) {
+            return res.status(400).json({ error: "No data received." });
+        }
+
+        // SMART MAPPING: Look for specific column names instead of column order
+        const values = data.map(row => {
+            // 1. Try to find the Code
+            // It looks for "Numéro de document", then "Code Client", and falls back to the 1st column if neither exist.
+            const code = row['Numéro de document'] || row['Code Client'] || row['code_client'] || row[Object.keys(row)[0]];
+            
+            // 2. Try to find the Name
+            // It explicitly looks for your "Client" column, then "Raison Sociale", etc.
+            const name = row['Client'] || row['Raison Sociale'] || row['nom_client'] || row[Object.keys(row)[2]];
+
+            return [ String(code), String(name) ]; 
+        });
+
+        const [result] = await pool.query(
+            'INSERT IGNORE INTO dim_clients (code_client, nom_client) VALUES ?',
+            [values]
+        );
+
+        res.json({
+            success: true,
+            total_processed: data.length,
+            inserted: result.affectedRows 
+        });
+
+    } catch (error) {
+        console.error("Sync Error:", error);
+        res.status(500).json({ error: 'Internal Server Error during synchronization.' });
+    }
+});
+// ==========================================
+// DATABASE EXPLORER: READ (GET) ROUTES
+// ==========================================
+
+app.get('/api/commerciaux', async (req, res) => {
+    try {
+        const [rows] = await pool.execute('SELECT id_commercial, nom_commercial, division, objectif_annuel FROM dim_commerciaux ORDER BY nom_commercial ASC');
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+app.get('/api/clients', async (req, res) => {
+    try {
+        const [rows] = await pool.execute('SELECT code_client, nom_client FROM dim_clients ORDER BY nom_client ASC LIMIT 200');
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+app.get('/api/articles', async (req, res) => {
+    try {
+        // Added prix_unitaire_ref to the SELECT statement
+        const [rows] = await pool.execute('SELECT code_article, designation, prix_unitaire_ref FROM dim_articles ORDER BY designation ASC LIMIT 200');
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// ==========================================
+// DATABASE EXPLORER: UPDATE (PUT) ROUTES
+// ==========================================
+
+// 1. Update Commercial (e.g., changing the Objectif Annuel)
+app.put('/api/commerciaux/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nom_commercial, division, objectif_annuel } = req.body;
+        
+        await pool.execute(
+            'UPDATE dim_commerciaux SET nom_commercial = ?, division = ?, objectif_annuel = ? WHERE id_commercial = ?',
+            [nom_commercial, division, objectif_annuel, id]
+        );
+        
+        res.json({ success: true, message: 'Commercial updated successfully' });
+    } catch (error) {
+        console.error("Update Error:", error);
+        res.status(500).json({ error: 'Failed to update Commercial' });
+    }
+});
+
+// 2. Update Client (e.g., fixing a typo in Raison Sociale)
+app.put('/api/clients/:id', async (req, res) => {
+    try {
+        const { id } = req.params; // Here, id is the code_client
+        const { nom_client } = req.body;
+        
+        await pool.execute(
+            'UPDATE dim_clients SET nom_client = ? WHERE code_client = ?',
+            [nom_client, id]
+        );
+        
+        res.json({ success: true, message: 'Client updated successfully' });
+    } catch (error) {
+        console.error("Update Error:", error);
+        res.status(500).json({ error: 'Failed to update Client' });
+    }
+});
+
+// 3. Update Article (e.g., fixing a Designation)
+app.put('/api/articles/:id', async (req, res) => {
+    try {
+        const { id } = req.params; 
+        const { designation, prix_unitaire_ref } = req.body;
+        
+        // Added prix_unitaire_ref to the UPDATE statement
+        await pool.execute(
+            'UPDATE dim_articles SET designation = ?, prix_unitaire_ref = ? WHERE code_article = ?',
+            [designation, prix_unitaire_ref, id]
+        );
+        
+        res.json({ success: true, message: 'Article updated successfully' });
+    } catch (error) {
+        console.error("Update Error:", error);
+        res.status(500).json({ error: 'Failed to update Article' });
     }
 });
 
