@@ -14,16 +14,16 @@ export default function Login() {
     setErrorMsg(''); // Clear previous errors
 
     try {
-      // Send credentials to Node.js backend
-      const response = await axios.post(`${import.meta.env.VITE_API_URL}/login`, {
-        username,
-        password
+      // 1. ADDED "const response = await" HERE
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/login`, { 
+        username, 
+        password 
       });
 
-      // If successful, save the JWT token to local storage
+      // 2. If successful, save the JWT token to local storage
       localStorage.setItem('pegasus_token', response.data.token);
       
-      // Teleport the user to the dashboard
+      // 3. Teleport the user to the dashboard
       navigate('/'); 
 
     } catch (error) {
@@ -35,7 +35,6 @@ export default function Login() {
       }
     }
   };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-10 rounded-3xl shadow-xl w-full max-w-md border border-gray-100">

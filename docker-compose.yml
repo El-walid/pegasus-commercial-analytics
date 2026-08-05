@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      - DB_HOST=172.22.160.1
+      - DB_PORT=3307           # FIX 1: Added explicit port
+      - DB_USER=root
+      - DB_PASS=Elwalid1010@@  # FIX 2: Changed from DB_PASSWORD to DB_PASS
+      - DB_NAME=pegasus_db  
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      # FIX 3: Removed /api from the base URL
+      - VITE_API_URL=http://localhost:5000/api
+    depends_on:
+      - backend

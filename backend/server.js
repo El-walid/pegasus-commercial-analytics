@@ -444,6 +444,219 @@ app.put('/api/articles/:id', async (req, res) => {
     }
 });
 
+// ==========================================
+// 3. BUBBLE CHART: PERFORMANCE COMMERCIAUX
+// ==========================================
+app.get('/api/bubble-commerciaux', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                com.nom_commercial,
+                COUNT(DISTINCT f.numero_fac) as nb_factures,
+                SUM(f.total_ht) as ca_realise,
+                (SUM(f.total_ht) / COUNT(DISTINCT f.numero_fac)) as ticket_moyen
+            FROM dim_commerciaux com
+            JOIN fact_factures_entetes f ON com.id_commercial = f.id_commercial
+            GROUP BY com.id_commercial, com.nom_commercial
+            HAVING nb_factures > 0
+        `;
+        const [rows] = await pool.execute(query);
+        res.json(rows);
+    } catch (error) {
+        console.error("Erreur Bubble:", error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// ==========================================
+// 4. SANKEY DIAGRAM: FLUX DE REVENUS
+// ==========================================
+app.get('/api/sankey-flow', async (req, res) => {
+    try {
+        const query1 = `
+            SELECT com.division AS source, com.nom_commercial AS target, SUM(f.total_ht) AS weight
+            FROM dim_commerciaux com
+            JOIN fact_factures_entetes f ON com.id_commercial = f.id_commercial
+            GROUP BY com.division, com.nom_commercial
+            HAVING weight > 0
+        `;
+        
+        const query2 = `
+            SELECT com.nom_commercial AS source, c.nom_client AS target, SUM(f.total_ht) AS weight
+            FROM dim_commerciaux com
+            JOIN fact_factures_entetes f ON com.id_commercial = f.id_commercial
+            JOIN dim_clients c ON f.code_client = c.code_client
+            GROUP BY com.nom_commercial, c.nom_client
+            ORDER BY weight DESC
+            LIMIT 30
+        `;
+
+        const [rows1] = await pool.execute(query1);
+        const [rows2] = await pool.execute(query2);
+
+        // 1. Calculate total INCOMING weight per Commercial (from Divisions)
+        const commercialTotals = {};
+        rows1.forEach(row => {
+            const comName = row.target || 'Inconnu';
+            commercialTotals[comName] = (commercialTotals[comName] || 0) + Number(row.weight);
+        });
+
+        // 2. Calculate total OUTGOING weight per Commercial (from the Top 30 Clients)
+        const commercialOutgoing = {};
+        rows2.forEach(row => {
+            const comName = row.source || 'Inconnu';
+            commercialOutgoing[comName] = (commercialOutgoing[comName] || 0) + Number(row.weight);
+        });
+
+        // 3. Find the missing weight and create "Autres Clients" flows to balance the diagram
+        const autresClientsFlows = [];
+        for (const [comName, totalIn] of Object.entries(commercialTotals)) {
+            const totalOut = commercialOutgoing[comName] || 0;
+            const difference = totalIn - totalOut;
+
+            // If there is leftover revenue not accounted for in the top 30 clients, route it to "Autres Clients"
+            // (Using > 1 to avoid floating point math errors)
+            if (difference > 1) { 
+                autresClientsFlows.push({
+                    source: comName,
+                    target: 'Autres Clients',
+                    weight: difference
+                });
+            }
+        }
+
+        // 4. Combine everything for Highcharts
+        const combinedData = [...rows1, ...rows2, ...autresClientsFlows].map(row => [
+            row.source || 'Inconnu',
+            row.target || 'Inconnu',
+            Number(row.weight)
+        ]);
+
+        res.json(combinedData);
+    } catch (error) {
+        console.error("Erreur Sankey:", error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+const { Ollama } = require('ollama');
+// Initialize Ollama (pointing to the WSL host gateway from inside Docker)
+const ollama = new Ollama({ host: 'http://host.docker.internal:11434' });
+// ==========================================
+// 5. AI ASSISTANT: SENIOR DATA ANALYST PIPELINE (WITH ROUTING)
+// ==========================================
+app.post('/api/ai-query', async (req, res) => {
+    try {
+        const { prompt } = req.body;
+
+        if (!prompt) return res.status(400).json({ error: "Prompt is required." });
+
+        const dbSchema = `
+        Schéma de la base de données Pegasus :
+        - dim_commerciaux (id_commercial, nom_commercial, division, objectif_annuel)
+        - dim_clients (code_client, nom_client)
+        - dim_articles (code_article, designation, prix_unitaire_ref)
+        - fact_factures_entetes (numero_fac, date_facture, id_commercial, code_client, total_ht)
+        - fact_factures_lignes (id_ligne, numero_fac, code_article, qte, prix_unitaire, total_ht_ligne, devise)
+        - v_factures_globales (numero_fac, date_facture, code_client, nom_client, nom_commercial, division, code_article, designation, qte, prix_unitaire, total_ht_ligne, devise)
+
+        Règles SQL Strictes & Anti-Crash :
+        1. La colonne de quantité s'appelle 'qte'.
+        2. Évite les ambiguïtés : utilise TOUJOURS des alias de table (ex: c.nom_commercial, f.total_ht) lors des JOIN manuels.
+        3. RÈGLE D'AGRÉGATION (CRITIQUE) : Pour trouver un "meilleur" (commercial, client, produit), tu DOIS utiliser un alias pour la somme et trier par cet alias. (Exemple : SELECT nom_commercial, SUM(total_ht) AS total_ventes ... ORDER BY total_ventes DESC LIMIT 1).
+        4. UTILISATION DE LA VUE (PRIORITÉ ABSOLUE) : Dès qu'une question implique de croiser plusieurs informations (ex: les ventes d'un client, les produits d'un commercial), interroge DIRECTEMENT la vue 'v_factures_globales' sans faire de JOIN.
+        5. FILTRES TEMPORELS : Si la question mentionne une année ou un mois, utilise les fonctions MySQL natives (Ex: YEAR(date_facture) = 2024 ou MONTH(date_facture) = 5).
+        6. RECHERCHE DE TEXTE : Si la question cherche un nom spécifique (client ou article), utilise LIKE '%mot%' en SQL pour éviter les erreurs de casse ou de frappe.
+        `;
+
+        // ÉTAPE 1 : Routeur d'intention & Génération SQL
+        const sqlGenerationResponse = await ollama.chat({
+            model: 'llama3.1',
+            messages: [
+                { 
+                    role: 'system', 
+                    content: `Tu es le routeur central de SEHI Pegasus.
+                    RÈGLE 1 : Si l'utilisateur dit juste "bonjour", "hi", "merci", ou pose une question qui n'a AUCUN rapport avec la base de données, tu DOIS répondre EXACTEMENT par un seul mot : CHITCHAT
+                    RÈGLE 2 : Si la question concerne les données, tu es un ingénieur SQL. Génère UNIQUEMENT la requête SQL brute commençant par SELECT. Aucun markdown, aucun texte explicatif.
+                    
+                    ${dbSchema}` 
+                },
+                { role: 'user', content: prompt }
+            ],
+            options: { temperature: 0 } 
+        });
+
+        let generatedSQL = sqlGenerationResponse.message.content.trim().replace(/```sql/g, '').replace(/```/g, '').trim();
+
+        console.log("🤖 Action de l'IA :", generatedSQL);
+
+        // 🟢 BIFURCATION : GESTION DES SALUTATIONS (CHIT-CHAT)
+        if (generatedSQL.toUpperCase() === 'CHITCHAT') {
+            const chatResponse = await ollama.chat({
+                model: 'llama3.1',
+                messages: [
+                    { 
+                        role: 'system', 
+                        content: 'Tu es l\'assistant IA amical et professionnel de SEHI Pegasus. Réponds poliment et de façon concise. Réponds toujours dans la même langue que l\'utilisateur.' 
+                    },
+                    { role: 'user', content: prompt }
+                ],
+                options: { temperature: 0.7 }
+            });
+            return res.json({ answer: chatResponse.message.content });
+        }
+
+        // 🔴 SÉCURITÉ SQL (Seulement si ce n'est pas du Chit-Chat)
+        if (!generatedSQL.toUpperCase().startsWith('SELECT')) {
+            return res.status(400).json({ answer: "Requête non autorisée. Je ne peux exécuter que des lectures (SELECT) ou répondre à des questions simples." });
+        }
+
+        // ÉTAPE 2 : Exécution de la requête
+        let dbResults;
+        try {
+            [dbResults] = await pool.execute(generatedSQL);
+        } catch (dbError) {
+            console.error("Erreur de syntaxe SQL:", dbError.message);
+            return res.status(500).json({ answer: `Mon moteur SQL a fait une erreur de syntaxe en tentant de croiser ces données. L'erreur interne est : ${dbError.message}` });
+        }
+
+        // ÉTAPE 3 : Le "Smart Analyst" (Insights & Prédictions)
+        const finalAnalysisResponse = await ollama.chat({
+            model: 'llama3.1',
+            messages: [
+                { 
+                    role: 'system', 
+                    content: `Tu es un Senior Data Analyst chez SEHI Pegasus.
+                    On te fournit une question et les résultats de la base de données.
+                    RÈGLE 1 : Réponds dans la langue de l'utilisateur.
+                    RÈGLE 2 : Tu DOIS structurer ta réponse exactement avec ces 4 parties (utilise des emojis et du gras) :
+                    
+                    **📊 Constat :** (La réponse directe et factuelle à la question)
+                    **💡 Analyse :** (Ce que ce chiffre signifie pour le business)
+                    **🚀 Recommandation :** (Une action stratégique à prendre)
+                    **🔮 Prédiction :** (Une projection logique basée sur ce contexte)
+                    
+                    RÈGLE 3 (CRITIQUE) : Formate TOUS les montants financiers avec la devise "MAD" (Dirham). N'utilise JAMAIS, sous AUCUN prétexte, le symbole Euro (€) ou Dollar ($). Les montants doivent être formatés proprement (ex: 15 420.50 MAD).
+                    
+                    Sois professionnel, percutant et visionnaire. Ne parle jamais de la requête SQL.` 
+                },
+                { 
+                    role: 'user', 
+                    content: `Question : "${prompt}"\n\nDonnées extraites : ${JSON.stringify(dbResults)}` 
+                }
+            ],
+            options: { temperature: 0.7 } 
+        });
+
+        res.json({ answer: finalAnalysisResponse.message.content });
+
+    } catch (error) {
+        console.error("Erreur globale:", error);
+        res.status(500).json({ answer: "Erreur critique du serveur IA. Vérifiez les logs Node.js." });
+    }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Serveur backend en cours d'exécution sur le port ${PORT}`);
