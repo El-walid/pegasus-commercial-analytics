@@ -218,8 +218,8 @@ app.get('/api/kpis', (req, res) => {
                                         commerciaux_actifs: commerciauxActifs,
                                         objectif_atteint: objectifAtteint + '%',
                                         top_vendeur: topVendeur.replace('Commercial ', 'C'),
-                                        top_client: topClient.length > 15 ? topClient.substring(0, 15) + '...' : topClient,
-                                        top_article: topArticle.length > 15 ? topArticle.substring(0, 15) + '...' : topArticle,
+                                        top_client: topClient,
+                                        top_article: topArticle,
                                         nb_factures: nbFactures,
                                         ticket_moyen: (ticketMoyen / 1000).toFixed(1) + 'K'
                                     });

@@ -386,12 +386,29 @@ export default function Dashboard() {
               { title: "Panier Moyen", value: kpiData ? `${kpiData.ticket_moyen} MAD` : "...", icon: ShoppingCart, color: "text-orange-400", bg: "bg-orange-500/10 border border-orange-500/20" },
             ].map((kpi, index) => (
               <div key={index} className="bg-[#0f1524]/70 backdrop-blur-3xl p-5 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-white/10 flex items-center gap-4 transition-transform hover:-translate-y-1 duration-300">
-                <div className={`p-3.5 rounded-2xl ${kpi.bg}`}>
+                
+                {/* Icône */}
+                <div className={`p-3.5 flex-shrink-0 rounded-2xl ${kpi.bg}`}>
                   <kpi.icon className={`h-6 w-6 ${kpi.color}`} />
                 </div>
-                <div>
-                  <p className="text-xs text-gray-400 font-medium">{kpi.title}</p>
-                  <p className="text-lg md:text-xl font-bold text-white tracking-tight">{kpi.value}</p>
+                
+                {/* Conteneur Textes + Tooltip */}
+                {/* 'group' permet d'activer un effet au survol sur les enfants, 'cursor-default' montre que c'est interactif */}
+                <div className="flex-1 min-w-0 relative group cursor-default">
+                  
+                  <p className="text-xs text-gray-400 font-medium truncate">{kpi.title}</p>
+                  
+                  <p className="text-lg md:text-xl font-bold text-white tracking-tight truncate">
+                    {kpi.value}
+                  </p>
+                  
+                  {/* NOTRE INFOBULLE CUSTOM (Apparaît instantanément au survol) */}
+                  {kpiData && (
+                    <div className="absolute top-full left-0 mt-2 hidden group-hover:block w-max max-w-[250px] whitespace-normal bg-[#1e293b] text-gray-100 text-xs font-medium rounded-lg py-2 px-3 z-50 shadow-[0_10px_40px_rgba(0,0,0,0.8)] border border-white/10">
+                      {kpi.value}
+                    </div>
+                  )}
+                  
                 </div>
               </div>
             ))}
