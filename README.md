@@ -1,9 +1,3 @@
-Here is a comprehensive, production-ready `README.md` for your **SEHI Pegasus** project. It documents the architecture, database schema, local Ollama LLM configuration, Docker setup from scratch, project structure, and all essential commands.
-
-You can copy and paste this directly into your `README.md` file.
-
----
-
 # 🚀 SEHI Pegasus — Autonomous AI Data Analyst & Analytics Suite
 
 **SEHI Pegasus** is a full-stack, enterprise-grade data analytics platform and AI assistant designed for business intelligence, database management, and natural language Text-to-SQL analysis. Powered by a local **Llama 3.1** model, React, Express, MySQL, and Docker, Pegasus delivers real-time business insights, interactive visual dashboards, and seamless Excel-to-SQL data ingestion.
@@ -312,22 +306,8 @@ npm run dev
 * Inline CRUD table editor for Commerciaux, Clients, and Articles.
 
 
+## 👤 Author
 
----
+**El Walid El Alaoui Fels**
 
-## 📄 Version Control & Git Commands
-
-```bash
-# Check modified tracking status
-git status
-
-# Stage all updated files
-git add .
-
-# Commit updates with descriptive commit message
-git commit -m "feat: complete Pegasus UI redesign, AI Text-to-SQL anti-crash rules, and Docker integration"
-
-# Push to remote main branch
-git push origin main
-
-```
+[LinkedIn Profile](https://www.linkedin.com/in/el-walid-el-alaoui-fels/) | [Upwork](https://www.upwork.com/freelancers/~01f4844810b3d78bf7)
