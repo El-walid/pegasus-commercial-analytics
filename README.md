@@ -304,3 +304,8 @@ npm run dev
 * Excel (`.xlsx`, `.csv`) drag-and-drop file parser and automated cleaner.
 * Direct database synchronization for client master data.
 * Inline CRUD table editor for Commerciaux, Clients, and Articles.
+
+
+## 👤 Author
+
+**El Walid El Alaoui Fels**
