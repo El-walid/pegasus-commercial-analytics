@@ -5,6 +5,7 @@ import {
   Menu, X, Sparkles, User, Lock, Cpu, Palette, Save, CheckCircle2, 
   AlertCircle, ShieldAlert, Bell, Globe
 } from 'lucide-react';
+import Sidebar from '../components/Sidebar';
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -96,46 +97,8 @@ export default function Settings() {
         <div className="absolute w-[500px] h-[500px] bg-gradient-to-tr from-amber-800 via-red-900 to-yellow-800 rounded-full blur-[100px] mix-blend-screen animate-chaotic-reverse" style={{ animationDelay: '-5s' }}></div>
       </div>
 
-      {/* MOBILE SIDEBAR OVERLAY */}
-      {isSidebarOpen && (
-        <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity" />
-      )}
-
-      {/* FIXED SIDEBAR */}
-      <aside className={`fixed md:relative z-50 h-full flex-shrink-0 transition-all duration-300 ease-in-out border-r border-white/10 bg-[#0a0f1c]/90 backdrop-blur-3xl overflow-hidden
-        ${isSidebarOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-0 md:translate-x-0'}`}>
-        <div className="w-64 h-full flex flex-col justify-between">
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                <Sparkles className="h-6 w-6 text-red-500" /> Pegasus
-              </h2>
-              <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-400 hover:text-white">
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <nav className="space-y-2">
-              <Link to="/" className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl font-medium transition-colors">
-                <LayoutDashboard className="h-5 w-5" /> Vue d'ensemble
-              </Link>
-              <Link to="/datahub" className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl font-medium transition-colors">
-                <Database className="h-5 w-5" /> Hub de Données
-              </Link>
-              <Link to="/ia" className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl font-medium transition-colors">
-                <Bot className="h-5 w-5" /> Assistant IA
-              </Link>
-              <Link to="/settings" className="flex items-center gap-3 px-4 py-3 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl font-medium shadow-[0_0_15px_rgba(239,68,68,0.1)] transition-colors">
-                <SettingsIcon className="h-5 w-5" /> Paramètres
-              </Link>
-            </nav>
-          </div>
-          <div className="p-6 border-t border-white/10">
-            <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl font-medium transition-colors">
-              <LogOut className="h-5 w-5" /> Déconnexion
-            </button>
-          </div>
-        </div>
-      </aside>
+      {/* SIDEBAR */}
+      <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
 
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col min-w-0 h-screen relative z-10">

@@ -1,9 +1,11 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import ProtectedRoute from './components/ProtectedRoute';
+
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import DataHub from './pages/DataHub';
 import AIAssistant from './pages/AIAssistant';
-import Settings from './components/Settings';
+import Settings from './pages/Settings';
 
 // Composant de protection dynamique
 const ProtectedRoute = ({ children }) => {
