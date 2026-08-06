@@ -1,9 +1,3 @@
-Here is a comprehensive, production-ready `README.md` for your **SEHI Pegasus** project. It documents the architecture, database schema, local Ollama LLM configuration, Docker setup from scratch, project structure, and all essential commands.
-
-You can copy and paste this directly into your `README.md` file.
-
----
-
 # 🚀 SEHI Pegasus — Autonomous AI Data Analyst & Analytics Suite
 
 **SEHI Pegasus** is a full-stack, enterprise-grade data analytics platform and AI assistant designed for business intelligence, database management, and natural language Text-to-SQL analysis. Powered by a local **Llama 3.1** model, React, Express, MySQL, and Docker, Pegasus delivers real-time business insights, interactive visual dashboards, and seamless Excel-to-SQL data ingestion.
