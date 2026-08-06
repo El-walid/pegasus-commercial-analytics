@@ -1,0 +1,17 @@
+source venv/bin/activate
+
+ollama serve
+
+docker compose up --build
+
+ollama run llama3.1
+
+npm run dev 
+
+npx nodemon server.js
+
+docker compose dowmn
+
+docker compose restart [backend, frontend]
+
+curl -fsSL https://ollama.com/install.sh | sh

@@ -1,16 +1,19 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
-import { LayoutDashboard, Database, Bot, Settings, LogOut, Menu, Sun, Moon, HardDrive, RefreshCw, AlertCircle, FileUp, Eraser, Send, ArrowUpDown, Trash2, Wand2, CheckCircle2, Users, Briefcase, Package, Edit2, Save, X } from 'lucide-react';
+import { 
+  LayoutDashboard, Database, Bot, Settings, LogOut, Menu, Sun, Moon, 
+  HardDrive, RefreshCw, AlertCircle, FileUp, Eraser, Send, ArrowUpDown, 
+  Trash2, Wand2, CheckCircle2, Users, Briefcase, Package, Edit2, Save, X, Sparkles 
+} from 'lucide-react';
 
 export default function DataHub() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
-  // UI States
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('pegasus_theme') === 'dark');
+  // UI States (Détecte si l'on est sur PC pour ouvrir par défaut)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const [systemStatus, setSystemStatus] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
   const [activeTab, setActiveTab] = useState('import'); 
@@ -22,21 +25,20 @@ export default function DataHub() {
   
   // Database States & Inline Editing
   const [dbData, setDbData] = useState({ commerciaux: [], clients: [], articles: [] });
-  const [editingRow, setEditingRow] = useState(null); // Stocke l'ID de la ligne en cours d'édition
-  const [editFormData, setEditFormData] = useState({}); // Stocke les données temporaires tapées par l'utilisateur
+  const [editingRow, setEditingRow] = useState(null); 
+  const [editFormData, setEditFormData] = useState({}); 
 
-  // 1. Dark Mode
+  // Ajustement de la Sidebar au redimensionnement
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('pegasus_theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('pegasus_theme', 'light');
-    }
-  }, [isDarkMode]);
+    const handleResize = () => {
+      if (window.innerWidth <= 768) setIsSidebarOpen(false);
+      else setIsSidebarOpen(true);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-  // 2. Fetch System Status & Database Tables
+  // Fetch System Status & Database Tables
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -69,10 +71,9 @@ export default function DataHub() {
   // ==========================================
   // INLINE EDITING LOGIC (CRUD)
   // ==========================================
-
   const handleEditClick = (row, pkName) => {
     setEditingRow(row[pkName]);
-    setEditFormData({ ...row }); // Copie la ligne entière dans le formulaire temporaire
+    setEditFormData({ ...row }); 
   };
 
   const handleEditChange = (e, key) => {
@@ -90,11 +91,8 @@ export default function DataHub() {
   const handleSaveClick = async (tableName, pkName) => {
     try {
       const id = editFormData[pkName];
-      
-      // Appel API PUT vers le backend
       await axios.put(`${import.meta.env.VITE_API_URL}/${tableName}/${id}`, editFormData);
 
-      // Mise à jour de l'état local pour refléter le changement sans recharger la page
       setDbData(prev => ({
         ...prev,
         [tableName]: prev[tableName].map(row => 
@@ -116,7 +114,6 @@ export default function DataHub() {
   // ==========================================
   // EXCEL IMPORT LOGIC
   // ==========================================
-
   const handleUploadClick = () => fileInputRef.current.click();
 
   const handleFileUpload = (e) => {
@@ -204,19 +201,19 @@ export default function DataHub() {
   // DYNAMIC RENDERER FOR DB TABLES
   // ==========================================
   const renderDbTable = (dataArray, columns, tableName, pkName) => (
-    <div className="overflow-auto max-h-[500px] custom-scrollbar rounded-xl border border-gray-100 dark:border-gray-800 animate-fade-in-up">
+    <div className="overflow-auto max-h-[500px] custom-scrollbar rounded-2xl border border-white/10 animate-fade-in-up">
       <table className="w-full text-left border-collapse min-w-[800px]">
-        <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10 shadow-sm">
+        <thead className="sticky top-0 bg-[#0a0f1c] z-10 shadow-sm">
           <tr>
             {columns.map((col, idx) => (
-              <th key={idx} onClick={() => handleSort(col.key, true, activeTab)} className="p-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <th key={idx} onClick={() => handleSort(col.key, true, activeTab)} className="p-4 text-xs font-semibold text-gray-400 uppercase border-b border-white/10 cursor-pointer hover:bg-white/5 transition-colors">
                 <div className="flex items-center gap-2">
                   {col.label}
                   <ArrowUpDown className="h-3 w-3 opacity-50" />
                 </div>
               </th>
             ))}
-            <th className="p-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-700 text-right">
+            <th className="p-4 text-xs font-semibold text-gray-400 uppercase border-b border-white/10 text-right">
               Actions
             </th>
           </tr>
@@ -226,17 +223,17 @@ export default function DataHub() {
             const isEditing = editingRow === row[pkName];
 
             return (
-              <tr key={rowIndex} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-b border-gray-50 dark:border-gray-800/50">
+              <tr key={rowIndex} className="hover:bg-white/[0.02] transition-colors border-b border-white/5">
                 
                 {/* RENDERING COLUMNS */}
                 {columns.map((col, colIndex) => (
-                  <td key={colIndex} className={`p-4 text-sm ${colIndex === 0 ? 'text-gray-900 dark:text-white font-bold' : 'text-gray-700 dark:text-gray-300'}`}>
+                  <td key={colIndex} className={`p-4 text-sm ${colIndex === 0 ? 'text-white font-bold' : 'text-gray-300'}`}>
                     {isEditing && col.editable ? (
                       <input 
                         type="text" 
                         value={editFormData[col.key] || ''} 
                         onChange={(e) => handleEditChange(e, col.key)}
-                        className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full bg-[#050914] border border-white/20 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-red-500/50"
                       />
                     ) : (
                       col.format ? col.format(row[col.key]) : row[col.key]
@@ -248,15 +245,15 @@ export default function DataHub() {
                 <td className="p-4 text-right">
                   {isEditing ? (
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => handleSaveClick(tableName, pkName)} className="p-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 transition-colors" title="Sauvegarder">
+                      <button onClick={() => handleSaveClick(tableName, pkName)} className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition-colors border border-emerald-500/20" title="Sauvegarder">
                         <Save className="h-4 w-4" />
                       </button>
-                      <button onClick={handleCancelEdit} className="p-1.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-200 transition-colors" title="Annuler">
+                      <button onClick={handleCancelEdit} className="p-1.5 bg-white/5 text-gray-400 rounded-lg hover:bg-white/10 transition-colors border border-white/10" title="Annuler">
                         <X className="h-4 w-4" />
                       </button>
                     </div>
                   ) : (
-                    <button onClick={() => handleEditClick(row, pkName)} className="p-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors" title="Éditer">
+                    <button onClick={() => handleEditClick(row, pkName)} className="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 transition-colors border border-blue-500/20" title="Éditer">
                       <Edit2 className="h-4 w-4" />
                     </button>
                   )}
@@ -271,101 +268,128 @@ export default function DataHub() {
   );
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
+    <div className="flex h-screen w-full overflow-hidden bg-[#050914] text-gray-200 font-sans relative">
       
-      {/* SIDEBAR */}
-      <aside className={`flex-shrink-0 transition-all duration-300 ease-in-out border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 ${isSidebarOpen ? 'w-64' : 'w-0 overflow-hidden'}`}>
+      {/* BACKGROUND GRID */}
+      <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
+           style={{ backgroundImage: 'linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
+      </div>
+
+      {/* MOBILE SIDEBAR OVERLAY */}
+      {isSidebarOpen && (
+        <div 
+          onClick={() => setIsSidebarOpen(false)} 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity"
+        />
+      )}
+
+      {/* FIXED SIDEBAR */}
+      <aside className={`fixed md:relative z-50 h-full flex-shrink-0 transition-all duration-300 ease-in-out border-r border-white/10 bg-[#0a0f1c]/90 backdrop-blur-3xl overflow-hidden
+        ${isSidebarOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-0 md:translate-x-0'}`}>
         <div className="w-64 h-full flex flex-col justify-between">
           <div className="p-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mb-8">Pegasus</h2>
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                <Sparkles className="h-6 w-6 text-red-500" /> Pegasus
+              </h2>
+              <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-400 hover:text-white">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
             <nav className="space-y-2">
-              <Link to="/" className="flex items-center gap-3 px-4 py-3 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white rounded-xl font-medium transition-colors">
+              <Link to="/" className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl font-medium transition-colors">
                 <LayoutDashboard className="h-5 w-5" /> Vue d'ensemble
               </Link>
-              <Link to="/datahub" className="flex items-center gap-3 px-4 py-3 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl font-medium transition-colors">
+              <Link to="/datahub" className="flex items-center gap-3 px-4 py-3 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl font-medium shadow-[0_0_15px_rgba(239,68,68,0.1)] transition-colors">
                 <Database className="h-5 w-5" /> Hub de Données
               </Link>
-              <Link to="/ia" className="flex items-center gap-3 px-4 py-3 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white rounded-xl font-medium transition-colors">
+              <Link to="/ia" className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl font-medium transition-colors">
                 <Bot className="h-5 w-5" /> Assistant IA
               </Link>
-              <Link to="/settings" className="flex items-center gap-3 px-4 py-3 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white rounded-xl font-medium transition-colors">
+              <Link to="/settings" className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl font-medium transition-colors">
                 <Settings className="h-5 w-5" /> Paramètres
               </Link>
             </nav>
           </div>
-          <div className="p-6 border-t border-gray-100 dark:border-gray-800">
-            <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl font-medium transition-colors">
+          <div className="p-6 border-t border-white/10">
+            <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl font-medium transition-colors">
               <LogOut className="h-5 w-5" /> Déconnexion
             </button>
           </div>
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen">
+      {/* MAIN CONTENT AREA */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen relative z-10">
         
         {/* TOP NAVBAR */}
-        <header className="flex-shrink-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-8 py-4 flex justify-between items-center z-10 transition-colors duration-300">
+        <header className="flex-shrink-0 bg-[#0f1524]/60 backdrop-blur-2xl border-b border-white/10 px-6 md:px-8 py-4 flex justify-between items-center z-20">
           <div className="flex items-center gap-4">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 transition-colors">
               <Menu className="h-5 w-5" />
             </button>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Hub de Données</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">Hub de Données</h1>
           </div>
-          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-            {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-xs text-gray-400 font-medium hidden sm:inline">MySQL Connecté</span>
+          </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+        {/* SCROLLABLE VIEW */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
+          {/* STATUS CARDS */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
+            <div className="bg-[#0f1524]/70 backdrop-blur-3xl p-6 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-white/10">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl"><HardDrive className="h-5 w-5" /></div>
-                  <h3 className="font-bold text-gray-900 dark:text-white">MySQL Status</h3>
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl"><HardDrive className="h-5 w-5" /></div>
+                  <h3 className="font-bold text-white tracking-tight">MySQL Status</h3>
                 </div>
-                <div className={`h-3 w-3 rounded-full ${systemStatus ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`}></div>
+                <div className={`h-3 w-3 rounded-full ${systemStatus ? 'bg-emerald-500 animate-pulse' : 'bg-red-500 animate-pulse'}`}></div>
               </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{systemStatus ? `${systemStatus.total_invoices} factures indexées.` : 'Connexion en cours...'}</p>
+              <p className="text-sm text-gray-400">{systemStatus ? `${systemStatus.total_invoices} factures indexées.` : 'Connexion en cours...'}</p>
             </div>
-            <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
+
+            <div className="bg-[#0f1524]/70 backdrop-blur-3xl p-6 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-white/10">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-xl"><RefreshCw className="h-5 w-5" /></div>
-                  <h3 className="font-bold text-gray-900 dark:text-white">Dernière Synchro</h3>
+                  <div className="p-3 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-xl"><RefreshCw className="h-5 w-5" /></div>
+                  <h3 className="font-bold text-white tracking-tight">Dernière Synchro</h3>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{systemStatus ? formatDate(systemStatus.last_sync) : '...'}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Date de la facture la plus récente.</p>
+              <p className="text-2xl font-bold text-white mb-1 tracking-tight">{systemStatus ? formatDate(systemStatus.last_sync) : '...'}</p>
+              <p className="text-sm text-gray-400">Date de la facture la plus récente.</p>
             </div>
-            <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
+
+            <div className="bg-[#0f1524]/70 backdrop-blur-3xl p-6 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-white/10">
                <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-xl"><AlertCircle className="h-5 w-5" /></div>
-                  <h3 className="font-bold text-gray-900 dark:text-white">Anomalies</h3>
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl"><AlertCircle className="h-5 w-5" /></div>
+                  <h3 className="font-bold text-white tracking-tight">Anomalies</h3>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{systemStatus ? `${systemStatus.anomalies} Rejets` : '...'}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Lors du dernier import système.</p>
+              <p className="text-2xl font-bold text-white mb-1 tracking-tight">{systemStatus ? `${systemStatus.anomalies} Rejets` : '...'}</p>
+              <p className="text-sm text-gray-400">Lors du dernier import système.</p>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 transition-colors">
+          {/* MAIN CONTAINER */}
+          <div className="bg-[#0f1524]/70 backdrop-blur-3xl p-6 md:p-8 rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-white/10 transition-colors">
             
             {/* TABS */}
-            <div className="flex flex-wrap gap-2 bg-gray-50 dark:bg-gray-800/50 p-1.5 rounded-xl mb-6 w-fit border border-gray-100 dark:border-gray-800">
-              <button onClick={() => { setActiveTab('import'); handleCancelEdit(); }} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${activeTab === 'import' ? 'bg-white dark:bg-gray-900 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+            <div className="flex flex-wrap gap-2 bg-black/30 p-1.5 rounded-2xl mb-8 w-fit border border-white/10">
+              <button onClick={() => { setActiveTab('import'); handleCancelEdit(); }} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${activeTab === 'import' ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
                 <FileUp className="h-4 w-4" /> Importation Excel
               </button>
-              <button onClick={() => { setActiveTab('commerciaux'); handleCancelEdit(); }} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${activeTab === 'commerciaux' ? 'bg-white dark:bg-gray-900 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+              <button onClick={() => { setActiveTab('commerciaux'); handleCancelEdit(); }} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${activeTab === 'commerciaux' ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
                 <Briefcase className="h-4 w-4" /> Commerciaux
               </button>
-              <button onClick={() => { setActiveTab('clients'); handleCancelEdit(); }} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${activeTab === 'clients' ? 'bg-white dark:bg-gray-900 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+              <button onClick={() => { setActiveTab('clients'); handleCancelEdit(); }} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${activeTab === 'clients' ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
                 <Users className="h-4 w-4" /> Clients
               </button>
-              <button onClick={() => { setActiveTab('articles'); handleCancelEdit(); }} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${activeTab === 'articles' ? 'bg-white dark:bg-gray-900 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+              <button onClick={() => { setActiveTab('articles'); handleCancelEdit(); }} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${activeTab === 'articles' ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
                 <Package className="h-4 w-4" /> Catalogue Articles
               </button>
             </div>
@@ -402,7 +426,6 @@ export default function DataHub() {
                   key: 'prix_unitaire_ref', 
                   label: 'Prix Unitaire', 
                   editable: true, 
-                  // Formats the number with exactly 2 decimal places and appends MAD
                   format: (val) => `${Number(val).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MAD` 
                 }
               ],
@@ -412,43 +435,43 @@ export default function DataHub() {
 
             {activeTab === 'import' && (
               importedData.length === 0 ? (
-                <div className="bg-gray-50 dark:bg-gray-800/20 py-16 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center text-center animate-fade-in-up">
-                  <div className="w-16 h-16 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center mb-6 shadow-sm">
-                    <FileUp className="h-8 w-8 text-blue-500 dark:text-blue-400" />
+                <div className="bg-black/20 py-16 rounded-3xl border border-dashed border-white/10 flex flex-col items-center justify-center text-center animate-fade-in-up">
+                  <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-full flex items-center justify-center mb-6 shadow-sm">
+                    <FileUp className="h-8 w-8 text-red-500" />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Importer des données</h3>
-                  <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-md">Déposez vos fichiers Excel (.xlsx, .csv) contenant de nouveaux clients ou objectifs.</p>
+                  <h3 className="text-xl font-bold text-white mb-2">Importer des données</h3>
+                  <p className="text-gray-400 mb-8 max-w-md text-sm">Déposez vos fichiers Excel (.xlsx, .csv) contenant de nouveaux clients ou objectifs.</p>
                   <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls, .csv" className="hidden" />
-                  <button onClick={handleUploadClick} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-medium transition-colors shadow-sm">
+                  <button onClick={handleUploadClick} className="bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-xl font-medium transition-colors shadow-[0_0_15px_rgba(220,38,38,0.3)]">
                     Parcourir les fichiers
                   </button>
                 </div>
               ) : (
                 <div className="animate-fade-in-up">
-                  <div className="flex justify-between items-center mb-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">Aperçu avant synchronisation</h3>
-                      <p className="text-sm text-gray-500">{importedData.length} lignes détectées</p>
+                      <h3 className="text-lg font-bold text-white">Aperçu avant synchronisation</h3>
+                      <p className="text-sm text-gray-400">{importedData.length} lignes détectées</p>
                     </div>
-                    <div className="flex gap-3">
-                      <button onClick={handleDiscard} className="flex items-center gap-2 px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-lg text-sm font-medium transition-colors">
+                    <div className="flex flex-wrap gap-3">
+                      <button onClick={handleDiscard} className="flex items-center gap-2 px-4 py-2 text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-sm font-medium transition-colors">
                         <Trash2 className="h-4 w-4" /> Annuler
                       </button>
-                      <button onClick={handleCleanData} className="flex items-center gap-2 px-4 py-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 rounded-lg text-sm font-medium transition-colors">
+                      <button onClick={handleCleanData} className="flex items-center gap-2 px-4 py-2 text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 rounded-xl text-sm font-medium transition-colors">
                         <Wand2 className="h-4 w-4" /> Nettoyer
                       </button>
-                      <button onClick={handleSyncToDatabase} className="flex items-center gap-2 px-4 py-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                      <button onClick={handleSyncToDatabase} className="flex items-center gap-2 px-4 py-2 text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl text-sm font-medium transition-colors shadow-[0_0_15px_rgba(16,185,129,0.3)]">
                         <Send className="h-4 w-4" /> Synchroniser DB
                       </button>
                     </div>
                   </div>
-                  <div className="overflow-auto max-h-[500px] custom-scrollbar rounded-xl border border-gray-100 dark:border-gray-800">
+                  <div className="overflow-auto max-h-[500px] custom-scrollbar rounded-2xl border border-white/10">
                     <table className="w-full text-left border-collapse min-w-[800px]">
-                      <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10 shadow-sm">
+                      <thead className="sticky top-0 bg-[#0a0f1c] z-10 shadow-sm">
                         <tr>
-                          <th className="p-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase w-12 text-center border-b border-gray-200 dark:border-gray-700">#</th>
+                          <th className="p-4 text-xs font-semibold text-gray-400 uppercase w-12 text-center border-b border-white/10">#</th>
                           {fileHeaders.map((header, idx) => (
-                            <th key={idx} onClick={() => handleSort(header)} className="p-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                            <th key={idx} onClick={() => handleSort(header)} className="p-4 text-xs font-semibold text-gray-400 uppercase border-b border-white/10 cursor-pointer hover:bg-white/5 transition-colors">
                               <div className="flex items-center gap-2">{header} <ArrowUpDown className="h-3 w-3 opacity-50" /></div>
                             </th>
                           ))}
@@ -456,10 +479,10 @@ export default function DataHub() {
                       </thead>
                       <tbody>
                         {importedData.map((row, rowIndex) => (
-                          <tr key={rowIndex} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-b border-gray-50 dark:border-gray-800/50">
-                            <td className="p-4 text-sm font-bold text-gray-400 text-center">{rowIndex + 1}</td>
+                          <tr key={rowIndex} className="hover:bg-white/[0.02] transition-colors border-b border-white/5">
+                            <td className="p-4 text-sm font-bold text-gray-500 text-center">{rowIndex + 1}</td>
                             {fileHeaders.map((header, colIndex) => (
-                              <td key={colIndex} className="p-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+                              <td key={colIndex} className="p-4 text-sm font-medium text-gray-300">
                                 {row[header] !== undefined && row[header] !== null && row[header] !== "" ? row[header] : <span className="text-red-400 text-xs italic">Vide</span>}
                               </td>
                             ))}
@@ -479,7 +502,7 @@ export default function DataHub() {
       {/* TOAST */}
       {toast.show && (
         <div className={`fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-xl border text-sm font-bold z-50 transition-all animate-fade-in-up ${
-          toast.type === 'success' ? 'bg-emerald-600 border-emerald-700 text-white' : toast.type === 'error' ? 'bg-red-600 border-red-700 text-white' : 'bg-blue-600 border-blue-700 text-white'
+          toast.type === 'success' ? 'bg-emerald-600 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]' : toast.type === 'error' ? 'bg-red-600 border-red-500 text-white shadow-[0_0_20px_rgba(220,38,38,0.4)]' : 'bg-blue-600 border-blue-500 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]'
         }`}>
           {toast.type === 'success' && <CheckCircle2 className="h-5 w-5" />}
           {toast.type === 'error' && <AlertCircle className="h-5 w-5" />}
