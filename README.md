@@ -304,24 +304,3 @@ npm run dev
 * Excel (`.xlsx`, `.csv`) drag-and-drop file parser and automated cleaner.
 * Direct database synchronization for client master data.
 * Inline CRUD table editor for Commerciaux, Clients, and Articles.
-
-
-
----
-
-## 📄 Version Control & Git Commands
-
-```bash
-# Check modified tracking status
-git status
-
-# Stage all updated files
-git add .
-
-# Commit updates with descriptive commit message
-git commit -m "feat: complete Pegasus UI redesign, AI Text-to-SQL anti-crash rules, and Docker integration"
-
-# Push to remote main branch
-git push origin main
-
-```
