@@ -309,3 +309,5 @@ npm run dev
 ## 👤 Author
 
 **El Walid El Alaoui Fels**
+
+[LinkedIn Profile](https://www.linkedin.com/in/el-walid-el-alaoui-fels/) | [Upwork](https://www.upwork.com/freelancers/~01f4844810b3d78bf7)
