@@ -3,14 +3,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import html2pdf from 'html2pdf.js';
-import { 
-  Send, Bot, User, Sparkles, LayoutDashboard, Database, 
-  Settings, LogOut, Menu, Paperclip, ArrowUp, Download, Copy, Check, ArrowLeft 
+import {
+  Send, Bot, User, Sparkles, LayoutDashboard, Database,
+  Settings, LogOut, Menu, Paperclip, ArrowUp, Download, Copy, Check, ArrowLeft
 } from 'lucide-react';
+import Sidebar from '../components/Sidebar';
 
 export default function ModernAIAssistant() {
   const navigate = useNavigate();
-  
+
   // States
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [input, setInput] = useState('');
@@ -18,7 +19,7 @@ export default function ModernAIAssistant() {
   const [hasStartedChat, setHasStartedChat] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
-  
+
   const chatContainerRef = useRef(null);
 
   // Smooth scroll fix
@@ -48,7 +49,7 @@ export default function ModernAIAssistant() {
     const element = document.getElementById(`ai-message-${index}`);
     const opt = {
       margin: 10,
-      filename: `Analyse_Pegasus_${new Date().toISOString().slice(0,10)}.pdf`,
+      filename: `Analyse_Pegasus_${new Date().toISOString().slice(0, 10)}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -58,7 +59,7 @@ export default function ModernAIAssistant() {
 
   const executeQuery = async (promptText) => {
     if (!promptText.trim()) return;
-    
+
     setHasStartedChat(true);
     const userMessage = { role: 'user', content: promptText };
     setMessages((prev) => [...prev, userMessage]);
@@ -86,7 +87,7 @@ export default function ModernAIAssistant() {
 
   return (
     <div className="relative flex h-screen w-screen bg-[#050914] overflow-hidden text-gray-200 font-sans">
-      
+
       {/* ADVANCED ORGANIC BLOB & HUE-SHIFT ANIMATIONS */}
       <style>{`
         @keyframes chaotic-drift {
@@ -118,55 +119,29 @@ export default function ModernAIAssistant() {
       `}</style>
 
       {/* 1. BACKGROUND GRID */}
-      <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
-           style={{ backgroundImage: 'linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
+      <div className="absolute inset-0 z-0 opacity-10 pointer-events-none"
+        style={{ backgroundImage: 'linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
       </div>
 
       {/* 2. RANDOM DRIFTING, COLOR-CHANGING "BREATHING" ORBS */}
       <div className={`absolute z-0 pointer-events-none transition-all duration-1000 ease-in-out left-1/2 top-1/2 ${hasStartedChat ? 'opacity-40 scale-125 translate-x-[20%] -translate-y-[20%]' : 'opacity-80 scale-100'}`}>
         {/* Primary Drifting Blob: Red to Crimson to Deep Purple */}
         <div className="absolute w-[600px] h-[600px] bg-gradient-to-r from-red-700 via-rose-900 to-purple-900 rounded-full mix-blend-screen animate-chaotic"></div>
-        
+
         {/* Secondary Drifting Blob: Orange to Brown to Crimson */}
         <div className="absolute w-[500px] h-[500px] bg-gradient-to-tr from-amber-800 via-red-900 to-yellow-800 rounded-full mix-blend-screen animate-chaotic-reverse" style={{ animationDelay: '-3s' }}></div>
-        
+
         {/* Breathing Core Glow */}
         <div className="absolute w-[350px] h-[350px] bg-red-600/30 rounded-full blur-[100px] mix-blend-screen animate-[pulse_5s_ease-in-out_infinite]" style={{ transform: 'translate(-50%, -50%)' }}></div>
       </div>
 
-      {/* 3. GLASSMORPHIC SIDEBAR */}
-      <aside className={`relative z-30 flex-shrink-0 transition-all duration-300 ease-in-out border-r border-white/10 bg-[#0a0f1c]/80 backdrop-blur-3xl ${isSidebarOpen ? 'w-64' : 'w-0 overflow-hidden'}`}>
-        <div className="w-64 h-full flex flex-col justify-between">
-          <div className="p-6">
-            <h2 className="text-2xl font-bold text-white tracking-tight mb-8 flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-red-500" /> Pegasus
-            </h2>
-            <nav className="space-y-2">
-              <Link to="/" className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors">
-                <LayoutDashboard className="h-5 w-5" /> Vue d'ensemble
-              </Link>
-              <Link to="/datahub" className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors">
-                <Database className="h-5 w-5" /> Hub de Données
-              </Link>
-              <Link to="/ia" className="flex items-center gap-3 px-4 py-3 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl transition-colors shadow-[0_0_15px_rgba(239,68,68,0.1)]">
-                <Bot className="h-5 w-5" /> Assistant IA
-              </Link>
-              <Link to="/settings" className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors">
-                <Settings className="h-5 w-5" /> Paramètres
-              </Link>
-            </nav>
-          </div>
-          <div className="p-6 border-t border-white/10">
-            <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors">
-              <LogOut className="h-5 w-5" /> Déconnexion
-            </button>
-          </div>
-        </div>
-      </aside>
+
+      {/*3. SIDEBAR */}
+      <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
 
       {/* 4. MAIN CONTENT AREA */}
       <div className="relative z-20 flex-1 flex flex-col min-w-0 h-screen">
-        
+
         {/* Top Control Bar (Sidebar Toggle + Exit Chat Button) */}
         <div className="absolute top-6 left-6 z-40 flex items-center gap-3">
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-lg bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 backdrop-blur-md transition-colors shadow-lg">
@@ -175,8 +150,8 @@ export default function ModernAIAssistant() {
 
           {/* EXIT CHAT BUTTON (Appears only when inside a conversation) */}
           {hasStartedChat && (
-            <button 
-              onClick={() => { setHasStartedChat(false); setMessages([]); }} 
+            <button
+              onClick={() => { setHasStartedChat(false); setMessages([]); }}
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:text-white hover:bg-white/10 backdrop-blur-md transition-colors shadow-lg text-xs font-medium"
             >
               <ArrowLeft className="h-4 w-4" /> Retour au menu
@@ -188,7 +163,7 @@ export default function ModernAIAssistant() {
         {!hasStartedChat ? (
           <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="w-full max-w-3xl flex flex-col items-start z-20">
-              
+
               <h1 className="text-5xl md:text-6xl font-semibold mb-2 text-white">Hey! El Walid</h1>
               <h2 className="text-3xl md:text-4xl text-gray-400 mb-12">Que puis-je analyser pour vous ?</h2>
 
@@ -230,12 +205,12 @@ export default function ModernAIAssistant() {
 
           /* --- VIEW B: CHAT STATE --- */
           <div className="flex flex-col h-full w-full max-w-5xl mx-auto pt-20 px-4 md:px-8 animate-in fade-in duration-500">
-            
+
             {/* Messages Area */}
             <main ref={chatContainerRef} className="flex-1 overflow-y-auto custom-scrollbar pr-4 space-y-6 pb-6 min-h-0">
               {messages.map((msg, index) => (
                 <div key={index} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  
+
                   {msg.role === 'ai' && (
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center flex-shrink-0 shadow-lg mt-1 border border-white/10">
                       <Bot className="h-5 w-5 text-white" />
@@ -253,7 +228,7 @@ export default function ModernAIAssistant() {
                       <div id={`ai-message-${index}`} className="p-5 w-full rounded-3xl text-sm leading-relaxed shadow-[0_4px_20px_rgba(0,0,0,0.3)] bg-[#0f1524]/80 backdrop-blur-xl border border-white/10 text-gray-200 rounded-tl-sm prose prose-invert max-w-none [&>p]:mb-3">
                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                       </div>
-                      
+
                       <div className="flex items-center gap-4 mt-3 ml-2">
                         <button onClick={() => handleCopyText(msg.content, index)} className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500 hover:text-red-500 transition-colors">
                           {copiedIndex === index ? <><Check className="h-3 w-3 text-red-500" /> <span className="text-red-500">Copié</span></> : <><Copy className="h-3 w-3" /> Copier</>}
@@ -264,7 +239,7 @@ export default function ModernAIAssistant() {
                       </div>
                     </div>
                   )}
-                  
+
                   {msg.role === 'user' && (
                     <div className="w-10 h-10 rounded-full bg-white/10 border border-white/10 flex items-center justify-center flex-shrink-0 mt-1 backdrop-blur-md">
                       <User className="h-5 w-5 text-gray-300" />

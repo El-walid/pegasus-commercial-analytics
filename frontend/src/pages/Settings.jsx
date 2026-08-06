@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { 
-  LayoutDashboard, Database, Bot, Settings as SettingsIcon, LogOut, 
-  Menu, X, Sparkles, User, Lock, Cpu, Palette, Save, CheckCircle2, 
+  Menu, X, User, Lock, Cpu, Palette, Save, CheckCircle2, 
   AlertCircle, ShieldAlert, Bell, Globe
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
@@ -10,25 +10,54 @@ import Sidebar from '../components/Sidebar';
 export default function Settings() {
   const navigate = useNavigate();
   
-  // UI States
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const [activeTab, setActiveTab] = useState('general');
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [isLoading, setIsLoading] = useState(false);
 
-  // Form States (Simulated User Data)
   const [formData, setFormData] = useState({
-    firstName: 'El Walid',
-    lastName: 'El Alaoui Fels',
-    email: 'elwalid.admin@sehi.ma',
-    role: 'Administrateur Système',
-    aiModel: 'llama3.1-8b',
-    syncInterval: '1h',
-    language: 'fr',
+    prenom: '',
+    nom: '',
+    email: '',
+    role: '',
+    aiModel: '',
+    syncInterval: '',
+    language: '',
     notifications: true
   });
 
-  // Resize Listener for Sidebar
+  const getAxiosConfig = () => {
+    const token = localStorage.getItem('pegasus_token');
+    return { headers: { Authorization: `Bearer ${token}` } };
+  };
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/user-settings`, getAxiosConfig());
+        const data = response.data;
+        
+        setFormData({
+          prenom: data.prenom || '',
+          nom: data.nom || '',
+          email: data.email || '',
+          role: data.role || 'Utilisateur',
+          aiModel: data.ai_model || 'llama3.1-8b',
+          syncInterval: data.sync_interval || '1h',
+          language: data.language || 'fr',
+          notifications: data.notifications !== undefined ? data.notifications : true
+        });
+      } catch (error) {
+        console.error("Erreur de chargement des paramètres:", error);
+        if (error.response && error.response.status === 401) {
+          localStorage.removeItem('pegasus_token');
+          navigate('/login');
+        }
+      }
+    };
+    fetchSettings();
+  }, [navigate]);
+
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth <= 768) setIsSidebarOpen(false);
@@ -38,9 +67,20 @@ export default function Settings() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('pegasus_token');
-    navigate('/login');
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    try {
+      await axios.put(`${import.meta.env.VITE_API_URL}/user-settings`, formData, getAxiosConfig());
+      setToast({ show: true, message: 'Paramètres sauvegardés avec succès.', type: 'success' });
+    } catch (error) {
+      console.error("Erreur de sauvegarde:", error);
+      setToast({ show: true, message: 'Erreur lors de la sauvegarde.', type: 'error' });
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+    }
   };
 
   const handleInputChange = (e) => {
@@ -51,22 +91,9 @@ export default function Settings() {
     }));
   };
 
-  const handleSave = (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    // Simulate API Call
-    setTimeout(() => {
-      setIsLoading(false);
-      setToast({ show: true, message: 'Paramètres sauvegardés avec succès.', type: 'success' });
-      setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
-    }, 800);
-  };
-
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#050914] text-gray-200 font-sans relative">
       
-      {/* ADVANCED ORGANIC BLOB ANIMATIONS */}
       <style>{`
         @keyframes chaotic-drift {
           0% { transform: translate(-50%, -50%) translate(0px, 0px) scale(1); }
@@ -86,24 +113,19 @@ export default function Settings() {
         .animate-chaotic-reverse { animation: chaotic-drift-reverse 25s ease-in-out infinite reverse; }
       `}</style>
 
-      {/* BACKGROUND GRID */}
       <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
            style={{ backgroundImage: 'linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
       </div>
 
-      {/* RANDOM DRIFTING ENERGY ORBS */}
       <div className="absolute left-1/2 top-1/2 z-0 pointer-events-none opacity-40">
         <div className="absolute w-[600px] h-[600px] bg-gradient-to-r from-red-800 via-rose-900 to-purple-900 rounded-full blur-[120px] mix-blend-screen animate-chaotic"></div>
         <div className="absolute w-[500px] h-[500px] bg-gradient-to-tr from-amber-800 via-red-900 to-yellow-800 rounded-full blur-[100px] mix-blend-screen animate-chaotic-reverse" style={{ animationDelay: '-5s' }}></div>
       </div>
 
-      {/* SIDEBAR */}
       <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
 
-      {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col min-w-0 h-screen relative z-10">
         
-        {/* TOP HEADER */}
         <header className="flex-shrink-0 bg-[#0f1524]/60 backdrop-blur-2xl border-b border-white/10 px-6 md:px-8 py-4 flex justify-between items-center z-20">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 transition-colors">
@@ -113,34 +135,30 @@ export default function Settings() {
           </div>
         </header>
 
-        {/* SCROLLABLE VIEW */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
           
           <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-8">
             
-            {/* SETTINGS SIDEBAR MENU (Left) */}
             <div className="w-full md:w-64 flex-shrink-0">
               <div className="bg-[#0f1524]/70 backdrop-blur-3xl p-3 rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-white/10 sticky top-0 flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-visible">
-                <button onClick={() => setActiveTab('general')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'general' ? 'bg-red-600/10 text-red-500 border border-red-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}>
+                <button type="button" onClick={() => setActiveTab('general')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'general' ? 'bg-red-600/10 text-red-500 border border-red-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}>
                   <User className="h-4 w-4" /> Profil Général
                 </button>
-                <button onClick={() => setActiveTab('security')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'security' ? 'bg-red-600/10 text-red-500 border border-red-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}>
+                <button type="button" onClick={() => setActiveTab('security')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'security' ? 'bg-red-600/10 text-red-500 border border-red-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}>
                   <Lock className="h-4 w-4" /> Sécurité
                 </button>
-                <button onClick={() => setActiveTab('system')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'system' ? 'bg-red-600/10 text-red-500 border border-red-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}>
+                <button type="button" onClick={() => setActiveTab('system')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'system' ? 'bg-red-600/10 text-red-500 border border-red-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}>
                   <Cpu className="h-4 w-4" /> IA & Base de Données
                 </button>
-                <button onClick={() => setActiveTab('appearance')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'appearance' ? 'bg-red-600/10 text-red-500 border border-red-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}>
+                <button type="button" onClick={() => setActiveTab('appearance')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'appearance' ? 'bg-red-600/10 text-red-500 border border-red-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}>
                   <Palette className="h-4 w-4" /> Préférences App
                 </button>
               </div>
             </div>
 
-            {/* SETTINGS CONTENT AREA (Right) */}
             <div className="flex-1">
               <form onSubmit={handleSave} className="bg-[#0f1524]/70 backdrop-blur-3xl p-6 md:p-8 rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-white/10 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 
-                {/* 1. GENERAL TAB */}
                 {activeTab === 'general' && (
                   <div className="space-y-6">
                     <div>
@@ -152,11 +170,11 @@ export default function Settings() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Prénom</label>
-                        <input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} className="w-full bg-[#050914]/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500/50 transition-colors" />
+                        <input type="text" name="prenom" value={formData.prenom} onChange={handleInputChange} className="w-full bg-[#050914]/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500/50 transition-colors" />
                       </div>
                       <div className="space-y-2">
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Nom</label>
-                        <input type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} className="w-full bg-[#050914]/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500/50 transition-colors" />
+                        <input type="text" name="nom" value={formData.nom} onChange={handleInputChange} className="w-full bg-[#050914]/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500/50 transition-colors" />
                       </div>
                       <div className="space-y-2 md:col-span-2">
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Email Professionnel</label>
@@ -170,7 +188,6 @@ export default function Settings() {
                   </div>
                 )}
 
-                {/* 2. SECURITY TAB */}
                 {activeTab === 'security' && (
                   <div className="space-y-6">
                     <div>
@@ -204,7 +221,6 @@ export default function Settings() {
                   </div>
                 )}
 
-                {/* 3. SYSTEM & AI TAB */}
                 {activeTab === 'system' && (
                   <div className="space-y-6">
                     <div>
@@ -245,7 +261,6 @@ export default function Settings() {
                   </div>
                 )}
 
-                {/* 4. APPEARANCE TAB */}
                 {activeTab === 'appearance' && (
                   <div className="space-y-6">
                     <div>
@@ -285,7 +300,6 @@ export default function Settings() {
                   </div>
                 )}
 
-                {/* SAVE BUTTON FOOTER */}
                 <div className="mt-8 pt-6 border-t border-white/10 flex justify-end">
                   <button type="submit" disabled={isLoading} className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold transition-colors shadow-[0_0_15px_rgba(220,38,38,0.4)] disabled:opacity-50">
                     {isLoading ? (
@@ -303,7 +317,6 @@ export default function Settings() {
         </main>
       </div>
 
-      {/* TOAST NOTIFICATION */}
       {toast.show && (
         <div className={`fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.6)] border text-sm font-bold z-50 transition-all animate-fade-in-up ${
           toast.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 backdrop-blur-3xl' : 'bg-red-500/10 border-red-500/30 text-red-400 backdrop-blur-3xl'
