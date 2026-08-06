@@ -3,6 +3,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import DataHub from './pages/DataHub';
 import AIAssistant from './pages/AIAssistant';
+import Settings from './components/Settings';
 
 // Composant de protection dynamique
 const ProtectedRoute = ({ children }) => {
@@ -41,6 +42,15 @@ function App() {
           element={
             <ProtectedRoute>
               <AIAssistant />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Settings />
             </ProtectedRoute>
           }
         />
