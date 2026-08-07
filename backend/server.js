@@ -183,9 +183,20 @@ app.get('/api/performances-commerciaux', (req, res) => {
 });
 
 app.get('/api/kpis', (req, res) => {
-    const division = req.query.division;
-    const whereClause = division ? 'WHERE c.division = ?' : '';
-    const params = division ? [division] : [];
+    const { division, commercial } = req.query;
+    
+    // 1. Construction dynamique de la clause WHERE pour supporter le filtrage
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+
+    if (division) {
+        whereClause += ' AND c.division = ?';
+        params.push(division);
+    }
+    if (commercial) {
+        whereClause += ' AND c.nom_commercial = ?';
+        params.push(commercial);
+    }
 
     db.query(`SELECT SUM(f.total_ht) as total FROM fact_factures_entetes f JOIN dim_commerciaux c ON f.id_commercial = c.id_commercial ${whereClause}`, params, (err, totalCaRow) => {
         if (err) return res.status(500).json({ error: 'Internal Server Error' });
@@ -194,9 +205,22 @@ app.get('/api/kpis', (req, res) => {
         db.query(`SELECT COUNT(DISTINCT f.id_commercial) as actifs FROM fact_factures_entetes f JOIN dim_commerciaux c ON f.id_commercial = c.id_commercial ${whereClause}`, params, (err, actifsRow) => {
             const commerciauxActifs = actifsRow[0].actifs;
 
-            db.query(`SELECT SUM(c.objectif_annuel) as total_obj FROM dim_commerciaux c ${whereClause}`, params, (err, objectifRow) => {
-                const totalObj = parseFloat(objectifRow[0].total_obj) || 1;
-                const objectifAtteint = ((totalCa / totalObj) * 100).toFixed(1);
+            // 2. NOUVEAU CALCUL : "Team Health" (Moyenne des taux d'atteinte individuels)
+            const avgAttainmentQuery = `
+                SELECT AVG(taux_atteinte) as global_attainment
+                FROM (
+                    SELECT 
+                        (COALESCE(SUM(f.total_ht), 0) / NULLIF(c.objectif_annuel, 0)) * 100 as taux_atteinte
+                    FROM dim_commerciaux c
+                    LEFT JOIN fact_factures_entetes f ON c.id_commercial = f.id_commercial
+                    ${whereClause}
+                    GROUP BY c.id_commercial, c.objectif_annuel
+                ) as subquery
+            `;
+
+            db.query(avgAttainmentQuery, params, (err, avgRow) => {
+                // S'il n'y a pas de données, on affiche 0
+                const objectifAtteint = avgRow[0]?.global_attainment ? parseFloat(avgRow[0].global_attainment).toFixed(1) : 0;
 
                 db.query(`SELECT c.nom_commercial, SUM(f.total_ht) as ca FROM fact_factures_entetes f JOIN dim_commerciaux c ON f.id_commercial = c.id_commercial ${whereClause} GROUP BY c.id_commercial ORDER BY ca DESC LIMIT 1`, params, (err, topVendeurRow) => {
                     const topVendeur = topVendeurRow.length > 0 ? topVendeurRow[0].nom_commercial : 'N/A';
@@ -375,14 +399,31 @@ app.get('/api/sankey-flow', (req, res) => {
 // ==========================================
 
 app.get('/api/system-status', (req, res) => {
+    // 1. Get total invoices
     db.query('SELECT COUNT(*) as total FROM fact_factures_entetes', (err, records) => {
         if (err) return res.status(500).json({ error: 'Database Connection Failed' });
+        
+        // 2. Get the date of the most recent invoice
         db.query('SELECT MAX(date_facture) as last_date FROM fact_factures_entetes', (err, lastSync) => {
-            res.json({
-                status: "Online",
-                total_invoices: records[0].total,
-                last_sync: lastSync[0].last_date || "N/A",
-                anomalies: 0 
+            if (err) return res.status(500).json({ error: 'Database Connection Failed' });
+
+            // 3. NEW: Count Anomalies (Invoices with a client code that doesn't exist in dim_clients)
+            const anomalyQuery = `
+                SELECT COUNT(f.numero_fac) as orphaned_invoices 
+                FROM fact_factures_entetes f 
+                LEFT JOIN dim_clients c ON f.code_client = c.code_client 
+                WHERE c.code_client IS NULL
+            `;
+
+            db.query(anomalyQuery, (err, anomaliesResult) => {
+                if (err) return res.status(500).json({ error: 'Database Connection Failed' });
+
+                res.json({
+                    status: "Online",
+                    total_invoices: records[0].total,
+                    last_sync: lastSync[0].last_date || "N/A",
+                    anomalies: anomaliesResult[0].orphaned_invoices 
+                });
             });
         });
     });

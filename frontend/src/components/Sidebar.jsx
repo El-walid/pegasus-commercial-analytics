@@ -40,8 +40,10 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }) {
           <div className="p-6">
             {/* Header / Logo */}
             <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                <Sparkles className="h-6 w-6 text-red-500" /> Pegasus
+              <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+                {/* 1. Point directly to the png in your public folder */}
+                <img src="/pegasus.png" alt="Pegasus Logo" className="h-8 w-8 object-contain" /> 
+                Pegasus Hub
               </h2>
               <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-400 hover:text-white">
                 <X className="h-6 w-6" />

@@ -19,8 +19,36 @@ export default function ModernAIAssistant() {
   const [hasStartedChat, setHasStartedChat] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
-
   const chatContainerRef = useRef(null);
+  const [name, setName] = useState("Guest");
+
+  useEffect(() => {
+    const fetchUserData = async () => { 
+      try { 
+        console.log("1. Starting to fetch user data...");
+        
+        // 1. Grab the secure token from the browser's local storage
+        const token = localStorage.getItem('pegasus_token');
+        
+        // 2. Send the request with the token attached manually
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/user-settings`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        
+        console.log("2. Backend responded! Here is the full data:", response.data);
+        
+        // 3. Update the state!
+        setName(response.data.prenom || "Guest");
+
+      } catch (error) {
+        console.error("❌ THE REQUEST FAILED:", error);
+      }
+    }; 
+    
+    fetchUserData();
+  }, []);
 
   // Smooth scroll fix
   useEffect(() => {
@@ -164,7 +192,7 @@ export default function ModernAIAssistant() {
           <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="w-full max-w-3xl flex flex-col items-start z-20">
 
-              <h1 className="text-5xl md:text-6xl font-semibold mb-2 text-white">Hey! El Walid</h1>
+              <h1 className="text-5xl md:text-6xl font-semibold mb-2 text-white">Hey! {name}</h1>
               <h2 className="text-3xl md:text-4xl text-gray-400 mb-12">Que puis-je analyser pour vous ?</h2>
 
               {/* Suggestions */}
