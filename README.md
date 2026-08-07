@@ -306,6 +306,7 @@ npm run dev
 * Inline CRUD table editor for Commerciaux, Clients, and Articles.
 
 
+
 ## 👤 Author
 
 **El Walid El Alaoui Fels**
