@@ -137,7 +137,7 @@ Pegasus bypasses third-party API dependencies by serving **Ollama** locally, ens
 ### 1. Engine Initialization (Linux / WSL2)
 
 ```bash
-curl -fsSL [https://ollama.com/install.sh](https://ollama.com/install.sh) | sh
+curl -fsSL https://ollama.com/install.sh | sh
 
 ```
 
