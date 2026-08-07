@@ -1,20 +1,28 @@
-# 🚀 SEHI Pegasus — Autonomous AI Data Analyst & Analytics Suite
+# SEHI Pegasus // Autonomous AI Data Analyst & Analytics Suite
 
-**SEHI Pegasus** is a full-stack, enterprise-grade data analytics platform and AI assistant designed for business intelligence, database management, and natural language Text-to-SQL analysis. Powered by a local **Llama 3.1** model, React, Express, MySQL, and Docker, Pegasus delivers real-time business insights, interactive visual dashboards, and seamless Excel-to-SQL data ingestion.
+![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
+![NodeJS](https://img.shields.io/badge/node.js-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)
+![Express.js](https://img.shields.io/badge/express.js-%23404d59.svg?style=for-the-badge&logo=express&logoColor=%2361DAFB)
+![MySQL](https://img.shields.io/badge/mysql-%2300000f.svg?style=for-the-badge&logo=mysql&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
+![Llama](https://img.shields.io/badge/Ollama_Llama_3.1-000000?style=for-the-badge&logo=meta&logoColor=white)
+
+**SEHI Pegasus** is a full-stack, enterprise-grade data analytics platform and AI processor designed for high-density business intelligence and natural language Text-to-SQL analysis. Powered by a local **Llama 3.1** model, React, Express, MySQL, and Docker, Pegasus delivers real-time telemetry, interactive visual topologies, and seamless Excel-to-SQL data ingestion within a secure, zero-latency environment.
 
 ---
 
-## 🛠️ Tech Stack
+## ⚙️ System Architecture
 
 * **Frontend:** React 18, Vite, Tailwind CSS, Lucide Icons, Highcharts, React Markdown, `html2pdf.js`
 * **Backend:** Node.js, Express, Axios, Multer, XLSX, JWT Authentication
-* **AI / LLM:** Ollama running **Llama 3.1** locally (128k context window, Text-to-SQL pipeline)
+* **Neural Processor:** Ollama running **Llama 3.1** locally (128k context window, specialized Text-to-SQL pipeline)
 * **Database:** MySQL 8.0 (`pegasus_db`)
 * **DevOps & Containerization:** Docker, Docker Compose, WSL2 (Ubuntu)
 
 ---
 
-## 📁 Project Directory Structure
+## 📁 Directory Structure
 
 ```text
 pegasus/
@@ -33,19 +41,19 @@ pegasus/
 │       ├── App.jsx             # React Router setup & protected routes
 │       ├── main.jsx
 │       └── components/
-│           ├── Login.jsx       # Energy Core glassmorphic login screen
-│           ├── Dashboard.jsx   # Highcharts cross-filtering analytics
-│           ├── DataHub.jsx     # Excel upload, data cleaner & inline CRUD
-│           └── AIAssistant.jsx # Siri-style animated orb UI with Ollama
+│           ├── Login.jsx       # Energy Core authentication gateway
+│           ├── Dashboard.jsx   # Executive Ledger & Highcharts telemetry
+│           ├── DataHub.jsx     # Buffer injection, data cleaner & inline CRUD
+│           └── AIAssistant.jsx # Neural AI interface with Llama 3.1
 └── README.md
 
 ```
 
 ---
 
-## 🗄️ Database Schema (`pegasus_db`)
+## 🗄️ Database Topology (`pegasus_db`)
 
-The platform relies on a relational star/snowflake schema with a uniﬁed view for high-performance AI querying.
+The platform relies on a strict relational star/snowflake schema, featuring a uniﬁed view optimized specifically for the Ollama Text-to-SQL engine.
 
 ```sql
 USE pegasus_db;
@@ -97,7 +105,7 @@ CREATE TABLE fact_factures_lignes (
     FOREIGN KEY (code_article) REFERENCES dim_articles(code_article) ON DELETE RESTRICT
 );
 
--- 6. Unified Global View (Optimized for Ollama Text-to-SQL)
+-- 6. Unified Global View (Optimized for Ollama Inference)
 CREATE VIEW v_factures_globales AS
 SELECT 
     e.numero_fac,
@@ -122,18 +130,18 @@ JOIN dim_articles a ON l.code_article = a.code_article;
 
 ---
 
-## 🦙 Ollama Local Setup & Serving
+## 🧠 Local LLM Deployment
 
-Pegasus uses **Ollama** running locally to provide fully private, zero-latency inference without third-party API costs.
+Pegasus bypasses third-party API dependencies by serving **Ollama** locally, ensuring absolute data privacy and zero-latency analytics processing.
 
-### 1. Install Ollama (Linux / WSL2)
+### 1. Engine Initialization (Linux / WSL2)
 
 ```bash
-curl -fsSL https://ollama.com/install.sh | sh
+curl -fsSL [https://ollama.com/install.sh](https://ollama.com/install.sh) | sh
 
 ```
 
-### 2. Start the Ollama Daemon
+### 2. Boot the Daemon
 
 ```bash
 # Start Ollama service in the background
@@ -141,18 +149,18 @@ ollama serve
 
 ```
 
-### 3. Pull and Serve the Llama 3.1 Model
+### 3. Mount the Neural Model
 
 ```bash
 # Pull Llama 3.1 model (8B parameters)
 ollama pull llama3.1
 
 # Verify the model is ready
-ollama run llama3.1 "Hello, are you ready?"
+ollama run llama3.1 "System diagnostic check."
 
 ```
 
-> **Note for Docker usage:** Ensure Ollama listens on all network interfaces (`0.0.0.0`) so backend containers can access host services:
+> **Note for Docker environments:** Ensure Ollama binds to all network interfaces (`0.0.0.0`) so backend containers can execute API calls against the host:
 > ```bash
 > OLLAMA_HOST=0.0.0.0:11434 ollama serve
 > 
@@ -162,11 +170,11 @@ ollama run llama3.1 "Hello, are you ready?"
 
 ---
 
-## 🐳 Docker Deployment from Scratch
+## 🐳 Docker Orchestration
 
-The application is containerized using Docker Compose to orchestrate MySQL, Node.js backend, and Vite frontend environments.
+The application environment is strictly containerized using Docker Compose to orchestrate MySQL, the Node.js backend, and the Vite frontend.
 
-### 1. Environment Variables Configuration
+### 1. Environment Configuration
 
 Create a `.env` file in the `backend/` directory:
 
@@ -177,7 +185,7 @@ DB_USER=pegasus_user
 DB_PASSWORD=pegasus_pass
 DB_NAME=pegasus_db
 JWT_SECRET=your_pegasus_jwt_secret_key_2026
-OLLAMA_URL=http://host.docker.internal:11434
+OLLAMA_URL=[http://host.docker.internal:11434](http://host.docker.internal:11434)
 
 ```
 
@@ -188,7 +196,7 @@ VITE_API_URL=http://localhost:5000/api
 
 ```
 
-### 2. `docker-compose.yml` Configuration
+### 2. Compose File (`docker-compose.yml`)
 
 ```yaml
 version: '3.8'
@@ -216,7 +224,7 @@ services:
       - "5000:5000"
     environment:
       - DB_HOST=mysql_db
-      - OLLAMA_URL=http://host.docker.internal:11434
+      - OLLAMA_URL=[http://host.docker.internal:11434](http://host.docker.internal:11434)
     depends_on:
       - mysql_db
     extra_hosts:
@@ -236,79 +244,56 @@ volumes:
 
 ```
 
-### 3. Docker Management Commands
+### 3. Execution Commands
 
 ```bash
-# Build and start all containers in detached mode
+# Build and ignite all containers in detached mode
 docker compose up --build -d
 
-# Check running container status
+# Verify system status
 docker compose ps
 
-# View live logs for backend and AI queries
+# Monitor live telemetry from the backend
 docker compose logs -f backend
 
-# Restart backend service after prompt modifications
-docker compose restart backend
-
-# Stop and remove all containers and networks
+# Terminate and purge all instances
 docker compose down
 
 ```
 
 ---
 
-## 💻 Local Development Setup (Without Docker)
+## 🔑 Core Capabilities
 
-If running directly on your host machine:
+1. **Neural Assistant Interface (`/ia`):**
+* Natural language to SQL query execution with prompt engineering guardrails.
+* Dynamic, pulsing **Crimson Core** UI matching the platform's monolithic aesthetic.
+* Structured 4-part AI responses: **[CONSTAT]**, **[ANALYSE]**, **[RECOMMANDATION]**, **[PRÉDICTION]**.
+* Instant client-side **PDF Export** and **Clipboard** pipeline.
 
-### Backend Setup
 
-```bash
-cd backend
-npm install
-npm start
-# Server runs on http://localhost:5000
+2. **Executive Ledger (`/`):**
+* Highcharts cross-filtering system (Bar, Donut, YoY Comparison, Bubble Portfolio, Sankey Revenue Flow).
+* Edge-to-edge cinematic grid layout.
+* Fully responsive, asymmetric typography scale.
 
-```
 
-### Frontend Setup
+3. **Data Injection Buffer (`/datahub`):**
+* Excel (`.xlsx`, `.csv`) parser and automated cleaner.
+* Direct database synchronization for client master data.
+* Inline, strict-border CRUD table editing for Database Management.
 
-```bash
-cd frontend
-npm install
-npm run dev
-# Vite server runs on http://localhost:5173
 
-```
 
 ---
 
-## 🔑 Key System Features
-
-1. **AI Assistant Page (`/ia`):**
-* Natural language to SQL query execution with prompt engineering guardrails.
-* Fluid **Energy Core** animated background orbs with chaotic drifting and morphing gradients.
-* Structured 4-part AI responses: **📊 Constat**, **💡 Analyse**, **🚀 Recommandation**, **🔮 Prédiction**.
-* Strict currency output forced to **MAD** (Moroccan Dirham).
-* Instant client-side **PDF Export** (`html2pdf.js`) and **Copy to Clipboard** capabilities.
-
-
-2. **Analytics Dashboard (`/`):**
-* Highcharts cross-filtering system (Bar, Donut, YoY Comparison, Bubble Portfolio, Sankey Revenue Flow).
-* Real-time KPI summaries.
-* Collapsible desktop and mobile sidebar drawer.
-
-
-3. **DataHub (`/datahub`):**
-* Excel (`.xlsx`, `.csv`) drag-and-drop file parser and automated cleaner.
-* Direct database synchronization for client master data.
-* Inline CRUD table editor for Commerciaux, Clients, and Articles.
-
-
-
-## 👤 Author
+## 👤 Architect
 
 **El Walid El Alaoui Fels**
 
-[LinkedIn Profile](https://www.linkedin.com/in/el-walid-el-alaoui-fels/) | [Upwork](https://www.upwork.com/freelancers/~01f4844810b3d78bf7)
+*Computer Systems Engineering Student (Cycle d'Ingénieur) — ISGA Marrakech*
+
+[LinkedIn](https://www.linkedin.com/in/el-walid-el-alaoui-fels/) | [GitHub](https://github.com/your-github)
+
+
+```
