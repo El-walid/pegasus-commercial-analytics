@@ -294,6 +294,3 @@ docker compose down
 *Computer Systems Engineering Student (Cycle d'Ingénieur) — ISGA Marrakech*
 
 [LinkedIn](https://www.linkedin.com/in/el-walid-el-alaoui-fels/) | [GitHub](https://github.com/your-github)
-
-
-```
