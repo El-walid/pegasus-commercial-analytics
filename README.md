@@ -293,4 +293,4 @@ docker compose down
 
 *Computer Systems Engineering Student (Cycle d'Ingénieur) — ISGA Marrakech*
 
-[LinkedIn](https://www.linkedin.com/in/el-walid-el-alaoui-fels/) | [GitHub](https://github.com/your-github)
+[LinkedIn](https://www.linkedin.com/in/el-walid-el-alaoui-fels/) | [Upwork]([https://github.com/your-github](https://www.upwork.com/freelancers/~01f4844810b3d78bf7))
