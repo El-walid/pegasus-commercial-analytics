@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
-  LayoutDashboard, Database, Bot, Settings as SettingsIcon, LogOut, X, Sparkles 
+  LayoutDashboard, Database, Bot, Settings as SettingsIcon, LogOut, X 
 } from 'lucide-react';
 
 export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }) {
@@ -14,63 +14,77 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }) {
     navigate('/login');
   };
 
-  // Helper function to determine if a link is active
+  // 1. Anti-Slop Link Styling (Zero border-radius, structural borders, uppercase tracking)
   const getLinkClasses = (path) => {
     const isActive = currentPath === path;
     return isActive
-      ? "flex items-center gap-3 px-4 py-3 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl font-medium shadow-[0_0_15px_rgba(239,68,68,0.1)] transition-colors"
-      : "flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl font-medium transition-colors";
+      ? "flex items-center gap-4 px-8 py-4 bg-white/[0.03] text-white border-l-2 border-red-600 transition-colors"
+      : "flex items-center gap-4 px-8 py-4 text-gray-500 hover:bg-white/[0.02] hover:text-gray-300 border-l-2 border-transparent transition-colors group";
   };
 
   return (
     <>
-      {/* MOBILE SIDEBAR OVERLAY */}
+      {/* MOBILE SIDEBAR OVERLAY (Kept dark and cinematic) */}
       {isSidebarOpen && (
         <div 
           onClick={() => setIsSidebarOpen(false)} 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          className="fixed inset-0 bg-black/80 backdrop-blur-md z-40 md:hidden transition-opacity"
         />
       )}
 
-      {/* FIXED SIDEBAR */}
-      <aside className={`fixed md:relative z-50 h-full flex-shrink-0 transition-all duration-300 ease-in-out border-r border-white/10 bg-[#0a0f1c]/90 backdrop-blur-3xl overflow-hidden
+      {/* FIXED SIDEBAR - THE OBSIDIAN LEDGER */}
+      <aside className={`fixed md:relative z-50 h-full flex-shrink-0 transition-all duration-300 ease-in-out border-r border-white/10 bg-black overflow-hidden
         ${isSidebarOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-0 md:translate-x-0'}`}>
+        
         <div className="w-64 h-full flex flex-col justify-between">
           
-          <div className="p-6">
+          <div className="flex flex-col">
             {/* Header / Logo */}
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
-                {/* 1. Point directly to the png in your public folder */}
-                <img src="/pegasus.png" alt="Pegasus Logo" className="h-8 w-8 object-contain" /> 
-                Pegasus Hub
+            <div className="p-8 flex justify-between items-center border-b border-white/10">
+              <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-3">
+                <img src="/pegasus.png" alt="Pegasus Logo" className="h-6 w-6 object-contain grayscale contrast-150" /> 
+                <span className="font-serif">Pegasus</span>
               </h2>
-              <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-400 hover:text-white">
-                <X className="h-6 w-6" />
+              <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-500 hover:text-white transition-colors">
+                <X className="h-5 w-5" />
               </button>
             </div>
             
-            {/* Navigation Links */}
-            <nav className="space-y-2">
-              <Link to="/" className={getLinkClasses('/')}>
-                <LayoutDashboard className="h-5 w-5" /> Vue d'ensemble
-              </Link>
-              <Link to="/datahub" className={getLinkClasses('/datahub')}>
-                <Database className="h-5 w-5" /> Hub de Données
-              </Link>
-              <Link to="/ia" className={getLinkClasses('/ia')}>
-                <Bot className="h-5 w-5" /> Assistant IA
-              </Link>
-              <Link to="/settings" className={getLinkClasses('/settings')}>
-                <SettingsIcon className="h-5 w-5" /> Paramètres
-              </Link>
-            </nav>
+            {/* Navigation Directory */}
+            <div className="py-6">
+              <span className="block px-8 mb-4 text-[9px] text-gray-600 uppercase tracking-[0.2em] font-mono">Système Central</span>
+              <nav className="flex flex-col">
+                <Link to="/" className={getLinkClasses('/')}>
+                  <LayoutDashboard className="h-4 w-4 flex-shrink-0" /> 
+                  <span className="text-[11px] uppercase tracking-widest font-medium">Vue d'ensemble</span>
+                </Link>
+                
+                <Link to="/datahub" className={getLinkClasses('/datahub')}>
+                  <Database className="h-4 w-4 flex-shrink-0" /> 
+                  <span className="text-[11px] uppercase tracking-widest font-medium">Hub Données</span>
+                </Link>
+                
+                <Link to="/ia" className={getLinkClasses('/ia')}>
+                  <Bot className="h-4 w-4 flex-shrink-0" /> 
+                  <span className="text-[11px] uppercase tracking-widest font-medium">Assistant IA</span>
+                </Link>
+                
+                <Link to="/settings" className={getLinkClasses('/settings')}>
+                  <SettingsIcon className="h-4 w-4 flex-shrink-0" /> 
+                  <span className="text-[11px] uppercase tracking-widest font-medium">Paramètres</span>
+                </Link>
+              </nav>
+            </div>
           </div>
           
           {/* Footer / Logout */}
-          <div className="p-6 border-t border-white/10">
-            <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl font-medium transition-colors border border-transparent hover:border-red-500/20">
-              <LogOut className="h-5 w-5" /> Déconnexion
+          <div className="border-t border-white/10 bg-black">
+            <button 
+              onClick={handleLogout} 
+              className="flex items-center gap-4 w-full px-8 py-6 text-gray-500 hover:text-red-500 hover:bg-white/[0.02] transition-colors group"
+            >
+              <LogOut className="h-4 w-4 group-hover:scale-110 transition-transform" /> 
+              <span className="text-[11px] uppercase tracking-widest font-medium">Déconnexion</span>
             </button>
           </div>
 
