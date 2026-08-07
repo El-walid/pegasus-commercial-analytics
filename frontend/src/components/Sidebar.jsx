@@ -42,7 +42,7 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }) {
             {/* Header / Logo */}
             <div className="p-8 flex justify-between items-center border-b border-white/10">
               <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-3">
-                <img src="/pegasus.png" alt="Pegasus Logo" className="h-6 w-6 object-contain grayscale contrast-150" /> 
+                <img src="/pegasus.png" alt="Pegasus Logo" className="h-6 w-6 object-contain contrast-200" /> 
                 <span className="font-serif">Pegasus</span>
               </h2>
               <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-500 hover:text-white transition-colors">
@@ -52,7 +52,7 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }) {
             
             {/* Navigation Directory */}
             <div className="py-6">
-              <span className="block px-8 mb-4 text-[9px] text-gray-600 uppercase tracking-[0.2em] font-mono">Système Central</span>
+              <span className="block px-8 mb-4 text-[12px] text-gray-600 uppercase tracking-[0.2em] font-mono">Système Central</span>
               <nav className="flex flex-col">
                 <Link to="/" className={getLinkClasses('/')}>
                   <LayoutDashboard className="h-4 w-4 flex-shrink-0" /> 

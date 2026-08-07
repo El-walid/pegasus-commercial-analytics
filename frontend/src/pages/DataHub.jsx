@@ -1,19 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { 
-  LayoutDashboard, Database, Bot, Settings, LogOut, Menu, Sun, Moon, 
-  HardDrive, RefreshCw, AlertCircle, FileUp, Eraser, Send, ArrowUpDown, 
-  Trash2, Wand2, CheckCircle2, Users, Briefcase, Package, Edit2, Save, X, Sparkles 
+  Menu, HardDrive, RefreshCw, AlertCircle, FileUp, Send, ArrowUpDown, 
+  Trash2, Wand2, Edit2, Save, X, PanelLeftClose, PanelLeftOpen 
 } from 'lucide-react';
 
 export default function DataHub() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
-  // UI States (Détecte si l'on est sur PC pour ouvrir par défaut)
+  // UI States
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const [systemStatus, setSystemStatus] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
@@ -29,12 +28,8 @@ export default function DataHub() {
   const [editingRow, setEditingRow] = useState(null); 
   const [editFormData, setEditFormData] = useState({}); 
 
-  // Ajustement de la Sidebar au redimensionnement
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth <= 768) setIsSidebarOpen(false);
-      else setIsSidebarOpen(true);
-    };
+    const handleResize = () => setIsSidebarOpen(window.innerWidth > 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -52,22 +47,13 @@ export default function DataHub() {
           axios.get(`${import.meta.env.VITE_API_URL}/articles`)
         ]);
 
-        setDbData({
-          commerciaux: commerciauxRes.data,
-          clients: clientsRes.data,
-          articles: articlesRes.data
-        });
+        setDbData({ commerciaux: commerciauxRes.data, clients: clientsRes.data, articles: articlesRes.data });
       } catch (error) {
         console.error("Erreur de chargement des données:", error);
       }
     };
     fetchData();
   }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem('pegasus_token');
-    navigate('/login');
-  };
 
   // ==========================================
   // INLINE EDITING LOGIC (CRUD)
@@ -77,17 +63,8 @@ export default function DataHub() {
     setEditFormData({ ...row }); 
   };
 
-  const handleEditChange = (e, key) => {
-    setEditFormData({
-      ...editFormData,
-      [key]: e.target.value
-    });
-  };
-
-  const handleCancelEdit = () => {
-    setEditingRow(null);
-    setEditFormData({});
-  };
+  const handleEditChange = (e, key) => setEditFormData({ ...editFormData, [key]: e.target.value });
+  const handleCancelEdit = () => { setEditingRow(null); setEditFormData({}); };
 
   const handleSaveClick = async (tableName, pkName) => {
     try {
@@ -96,20 +73,20 @@ export default function DataHub() {
 
       setDbData(prev => ({
         ...prev,
-        [tableName]: prev[tableName].map(row => 
-          row[pkName] === id ? editFormData : row
-        )
+        [tableName]: prev[tableName].map(row => row[pkName] === id ? editFormData : row)
       }));
 
-      setToast({ show: true, message: `Mise à jour réussie.`, type: 'success' });
+      showToast(`Entrée ${id} mise à jour avec succès.`, 'success');
       setEditingRow(null);
-      setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 3000);
-
     } catch (error) {
       console.error("Erreur de mise à jour:", error);
-      setToast({ show: true, message: "Erreur lors de la mise à jour.", type: 'error' });
-      setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 3000);
+      showToast("Échec de la transaction de mise à jour.", 'error');
     }
+  };
+
+  const showToast = (message, type) => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 4000);
   };
 
   // ==========================================
@@ -171,95 +148,77 @@ export default function DataHub() {
     setSortConfig({ key, direction });
   };
 
-  const handleDiscard = () => {
-    setImportedData([]);
-    setFileHeaders([]);
-  };
+  const handleDiscard = () => { setImportedData([]); setFileHeaders([]); };
 
   const handleSyncToDatabase = async () => {
     try {
       const response = await axios.post(`${import.meta.env.VITE_API_URL}/sync-clients`, { data: importedData });
       const { inserted, total_processed } = response.data;
 
-      if (inserted === 0) {
-        setToast({ show: true, message: `Données déjà existantes. Aucun nouveau champ ajouté parmi les ${total_processed} lignes.`, type: 'info' });
-      } else {
-        setToast({ show: true, message: `Succès ! ${inserted} nouveaux clients ajoutés à la base de données.`, type: 'success' });
-      }
-      setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 5000);
+      if (inserted === 0) showToast(`Données redondantes. 0 ajouts sur ${total_processed} lignes traitées.`, 'info');
+      else showToast(`Synchronisation réussie : ${inserted} nouvelles entités injectées.`, 'success');
     } catch (error) {
-      setToast({ show: true, message: "Erreur critique lors de la synchronisation.", type: 'error' });
-      setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 5000);
+      showToast("Erreur critique : Échec de l'injection des données.", 'error');
     }
   };
 
   const formatDate = (dateString) => {
-    if (!dateString || dateString === "N/A") return "Inconnue";
-    return new Date(dateString).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+    if (!dateString || dateString === "N/A") return "N/A";
+    return new Date(dateString).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   // ==========================================
-  // DYNAMIC RENDERER FOR DB TABLES
+  // STRICT ARCHITECTURAL TABLE RENDERER
   // ==========================================
   const renderDbTable = (dataArray, columns, tableName, pkName) => (
-    <div className="overflow-auto max-h-[500px] custom-scrollbar rounded-2xl border border-white/10 animate-fade-in-up">
-      <table className="w-full text-left border-collapse min-w-[800px]">
-        <thead className="sticky top-0 bg-[#0a0f1c] z-10 shadow-sm">
+    <div className="overflow-auto max-h-[600px] custom-scrollbar border border-white/10 bg-[#050505]">
+      <table className="w-full text-left border-collapse min-w-[700px] md:min-w-[800px]">
+        <thead className="sticky top-0 bg-[#0a0a0a] z-10 border-b border-white/10">
           <tr>
             {columns.map((col, idx) => (
-              <th key={idx} onClick={() => handleSort(col.key, true, activeTab)} className="p-4 text-xs font-semibold text-gray-400 uppercase border-b border-white/10 cursor-pointer hover:bg-white/5 transition-colors">
+              <th key={idx} onClick={() => handleSort(col.key, true, activeTab)} className="p-3 md:p-4 text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-gray-500 cursor-pointer hover:text-white transition-colors">
                 <div className="flex items-center gap-2">
-                  {col.label}
-                  <ArrowUpDown className="h-3 w-3 opacity-50" />
+                  {col.label} <ArrowUpDown className="h-3 w-3 opacity-30" />
                 </div>
               </th>
             ))}
-            <th className="p-4 text-xs font-semibold text-gray-400 uppercase border-b border-white/10 text-right">
-              Actions
-            </th>
+            <th className="p-3 md:p-4 text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-gray-500 text-right">Actions</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-white/5">
           {dataArray.map((row, rowIndex) => {
             const isEditing = editingRow === row[pkName];
-
             return (
-              <tr key={rowIndex} className="hover:bg-white/[0.02] transition-colors border-b border-white/5">
-                
-                {/* RENDERING COLUMNS */}
-                {columns.map((col, colIndex) => (
-                  <td key={colIndex} className={`p-4 text-sm ${colIndex === 0 ? 'text-white font-bold' : 'text-gray-300'}`}>
-                    {isEditing && col.editable ? (
-                      <input 
-                        type="text" 
-                        value={editFormData[col.key] || ''} 
-                        onChange={(e) => handleEditChange(e, col.key)}
-                        className="w-full bg-[#050914] border border-white/20 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-red-500/50"
-                      />
-                    ) : (
-                      col.format ? col.format(row[col.key]) : row[col.key]
-                    )}
-                  </td>
-                ))}
-
-                {/* RENDERING ACTION BUTTONS */}
-                <td className="p-4 text-right">
+              <tr key={rowIndex} className="hover:bg-white/[0.02] transition-colors group">
+                {columns.map((col, colIndex) => {
+                  const isIdOrNumber = col.key.includes('id') || col.key.includes('code') || col.key.includes('prix') || col.key.includes('objectif');
+                  return (
+                    <td key={colIndex} className={`p-3 md:p-4 text-xs md:text-sm ${isIdOrNumber ? 'font-mono text-gray-400' : 'text-gray-200'}`}>
+                      {isEditing && col.editable ? (
+                        <input 
+                          type="text" 
+                          value={editFormData[col.key] || ''} 
+                          onChange={(e) => handleEditChange(e, col.key)}
+                          className="w-full bg-transparent border-b border-white/30 px-0 py-1 text-xs md:text-sm text-white focus:outline-none focus:border-red-600 font-mono transition-colors"
+                        />
+                      ) : (
+                        col.format ? col.format(row[col.key]) : row[col.key]
+                      )}
+                    </td>
+                  );
+                })}
+                <td className="p-3 md:p-4 text-right">
                   {isEditing ? (
-                    <div className="flex justify-end gap-2">
-                      <button onClick={() => handleSaveClick(tableName, pkName)} className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition-colors border border-emerald-500/20" title="Sauvegarder">
-                        <Save className="h-4 w-4" />
-                      </button>
-                      <button onClick={handleCancelEdit} className="p-1.5 bg-white/5 text-gray-400 rounded-lg hover:bg-white/10 transition-colors border border-white/10" title="Annuler">
-                        <X className="h-4 w-4" />
-                      </button>
+                    <div className="flex justify-end gap-2 md:gap-3">
+                      <button onClick={handleCancelEdit} className="text-[9px] md:text-[10px] uppercase tracking-widest text-gray-500 hover:text-gray-300">Annuler</button>
+                      <button onClick={() => handleSaveClick(tableName, pkName)} className="text-[9px] md:text-[10px] uppercase tracking-widest text-emerald-500 hover:text-emerald-400 font-bold">Sauvegarder</button>
                     </div>
                   ) : (
-                    <button onClick={() => handleEditClick(row, pkName)} className="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 transition-colors border border-blue-500/20" title="Éditer">
-                      <Edit2 className="h-4 w-4" />
+                    <button onClick={() => handleEditClick(row, pkName)} className="text-[9px] md:text-[10px] uppercase tracking-widest text-gray-500 hover:text-blue-400 flex items-center gap-2 ml-auto md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                      <Edit2 className="h-3 w-3" /> Éditer
                     </button>
                   )}
                 </td>
-
               </tr>
             );
           })}
@@ -269,92 +228,90 @@ export default function DataHub() {
   );
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#050914] text-gray-200 font-sans relative">
+    <div className="flex h-screen w-full overflow-hidden bg-black text-gray-200 font-sans relative selection:bg-white/20 selection:text-white">
       
-      {/* BACKGROUND GRID */}
-      <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
-           style={{ backgroundImage: 'linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
-      </div>
-
-
-      {/* SIDEBAR */}
+      {/* GLOBAL SIDEBAR */}
       <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
 
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col min-w-0 h-screen relative z-10">
         
-        {/* TOP NAVBAR */}
-        <header className="flex-shrink-0 bg-[#0f1524]/60 backdrop-blur-2xl border-b border-white/10 px-6 md:px-8 py-4 flex justify-between items-center z-20">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 transition-colors">
-              <Menu className="h-5 w-5" />
-            </button>
-            <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">Hub de Données</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-xs text-gray-400 font-medium hidden sm:inline">MySQL Connecté</span>
-          </div>
+        {/* MOBILE HEADER */}
+        <header className="md:hidden flex-shrink-0 bg-black/90 backdrop-blur-md border-b border-white/10 px-6 py-4 flex justify-between items-center z-20 sticky top-0">
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-400 hover:text-white transition-colors">
+            <Menu className="h-6 w-6" />
+          </button>
+          <h1 className="text-xl font-serif font-bold text-white">Hub de Données</h1>
         </header>
 
-        {/* SCROLLABLE VIEW */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-          
-          {/* STATUS CARDS */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
-            <div className="bg-[#0f1524]/70 backdrop-blur-3xl p-6 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-white/10">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl"><HardDrive className="h-5 w-5" /></div>
-                  <h3 className="font-bold text-white tracking-tight">MySQL Status</h3>
-                </div>
-                <div className={`h-3 w-3 rounded-full ${systemStatus ? 'bg-emerald-500 animate-pulse' : 'bg-red-500 animate-pulse'}`}></div>
-              </div>
-              <p className="text-sm text-gray-400">{systemStatus ? `${systemStatus.total_invoices} factures indexées.` : 'Connexion en cours...'}</p>
-            </div>
-
-            <div className="bg-[#0f1524]/70 backdrop-blur-3xl p-6 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-white/10">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-xl"><RefreshCw className="h-5 w-5" /></div>
-                  <h3 className="font-bold text-white tracking-tight">Dernière Synchro</h3>
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-white mb-1 tracking-tight">{systemStatus ? formatDate(systemStatus.last_sync) : '...'}</p>
-              <p className="text-sm text-gray-400">Date de la facture la plus récente.</p>
-            </div>
-
-            <div className="bg-[#0f1524]/70 backdrop-blur-3xl p-6 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-white/10">
-               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl"><AlertCircle className="h-5 w-5" /></div>
-                  <h3 className="font-bold text-white tracking-tight">Anomalies</h3>
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-white mb-1 tracking-tight">{systemStatus ? `${systemStatus.anomalies} Rejets` : '...'}</p>
-              <p className="text-sm text-gray-400">Lors du dernier import système.</p>
-            </div>
+        {/* DESKTOP HEADER & TELEMETRY RIBBON */}
+        <div className="flex-shrink-0 border-b border-white/10 bg-black">
+           <div className="p-8 hidden md:flex justify-between items-start">
+             <div>
+                <h1 className="text-3xl text-white font-serif tracking-tight">Hub de Données</h1>
+                <p className="text-xs text-gray-500 uppercase tracking-widest mt-2">Centre de Contrôle & Synchronisation</p>
+             </div>
+             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-500 hover:text-white transition-colors p-2 hover:bg-white/5">
+                {isSidebarOpen ? <PanelLeftClose className="h-5 w-5" /> : <PanelLeftOpen className="h-5 w-5" />}
+             </button>
           </div>
 
-          {/* MAIN CONTAINER */}
-          <div className="bg-[#0f1524]/70 backdrop-blur-3xl p-6 md:p-8 rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-white/10 transition-colors">
+          {/* TELEMETRY LEDGER */}
+          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-white/10 border-t border-white/10 bg-[#050505]">
+            <div className="p-4 md:p-6 flex justify-between items-center group">
+              <div>
+                <span className="text-[9px] md:text-[10px] text-gray-500 uppercase tracking-[0.2em] block mb-1">Indexation MySQL</span>
+                <span className="text-xl md:text-2xl font-mono text-white">{systemStatus ? systemStatus.total_invoices : '...'}</span>
+              </div>
+              <div className={`h-2 w-2 rounded-full ${systemStatus ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-red-500'} animate-pulse`} />
+            </div>
             
-            {/* TABS */}
-            <div className="flex flex-wrap gap-2 bg-black/30 p-1.5 rounded-2xl mb-8 w-fit border border-white/10">
-              <button onClick={() => { setActiveTab('import'); handleCancelEdit(); }} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${activeTab === 'import' ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
-                <FileUp className="h-4 w-4" /> Importation Excel
-              </button>
-              <button onClick={() => { setActiveTab('commerciaux'); handleCancelEdit(); }} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${activeTab === 'commerciaux' ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
-                <Briefcase className="h-4 w-4" /> Commerciaux
-              </button>
-              <button onClick={() => { setActiveTab('clients'); handleCancelEdit(); }} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${activeTab === 'clients' ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
-                <Users className="h-4 w-4" /> Clients
-              </button>
-              <button onClick={() => { setActiveTab('articles'); handleCancelEdit(); }} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${activeTab === 'articles' ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
-                <Package className="h-4 w-4" /> Catalogue Articles
-              </button>
+            <div className="p-4 md:p-6 flex justify-between items-center">
+              <div>
+                <span className="text-[9px] md:text-[10px] text-gray-500 uppercase tracking-[0.2em] block mb-1">Dernier Import</span>
+                <span className="text-xl md:text-2xl font-mono text-white">{systemStatus ? formatDate(systemStatus.last_sync) : '...'}</span>
+              </div>
+              <RefreshCw className="h-5 w-5 text-gray-600" />
             </div>
 
+            <div className="p-4 md:p-6 flex justify-between items-center">
+              <div>
+                <span className="text-[9px] md:text-[10px] text-gray-500 uppercase tracking-[0.2em] block mb-1">Anomalies Détectées</span>
+                <span className={`text-xl md:text-2xl font-mono ${systemStatus?.anomalies > 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                  {systemStatus ? systemStatus.anomalies : '0'}
+                </span>
+              </div>
+              <AlertCircle className={`h-5 w-5 ${systemStatus?.anomalies > 0 ? 'text-red-500' : 'text-gray-600'}`} />
+            </div>
+          </div>
+        </div>
+
+        {/* SCROLLABLE MAIN CANVAS */}
+        <main className="flex-1 overflow-y-auto bg-black custom-scrollbar">
+          
+          {/* TAB DIRECTORY - Mobile horizontally scrollable */}
+          <div className="flex border-b border-white/10 bg-[#050505] sticky top-0 md:static z-20 overflow-x-auto custom-scrollbar whitespace-nowrap">
+            {[
+              { id: 'import', label: "Terminal d'Importation" },
+              { id: 'commerciaux', label: 'Registre Commerciaux' },
+              { id: 'clients', label: 'Base Clients' },
+              { id: 'articles', label: 'Référentiel Articles' }
+            ].map(tab => (
+              <button 
+                key={tab.id}
+                onClick={() => { setActiveTab(tab.id); handleCancelEdit(); }} 
+                className={`px-6 md:px-8 py-3.5 md:py-4 text-[10px] md:text-[11px] uppercase tracking-widest font-medium transition-all flex-shrink-0 ${
+                  activeTab === tab.id 
+                    ? 'text-white border-b-2 border-red-600 bg-white/[0.02]' 
+                    : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.01]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-4 md:p-8">
             {/* CONTENT ROUTING */}
             {activeTab === 'commerciaux' && renderDbTable(
               dbData.commerciaux, 
@@ -362,10 +319,9 @@ export default function DataHub() {
                 { key: 'id_commercial', label: 'ID', editable: false },
                 { key: 'nom_commercial', label: 'Nom du Commercial', editable: true },
                 { key: 'division', label: 'Division', editable: true },
-                { key: 'objectif_annuel', label: 'Objectif Annuel', editable: true, format: (val) => `${Number(val).toLocaleString('fr-FR')} MAD` }
+                { key: 'objectif_annuel', label: 'Objectif Annuel', editable: true, format: (val) => `${Number(val).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MAD` }
               ],
-              'commerciaux',
-              'id_commercial'
+              'commerciaux', 'id_commercial'
             )}
 
             {activeTab === 'clients' && renderDbTable(
@@ -374,8 +330,7 @@ export default function DataHub() {
                 { key: 'code_client', label: 'Code Client', editable: false },
                 { key: 'nom_client', label: 'Raison Sociale', editable: true }
               ],
-              'clients',
-              'code_client'
+              'clients', 'code_client'
             )}
 
             {activeTab === 'articles' && renderDbTable(
@@ -383,68 +338,64 @@ export default function DataHub() {
               [
                 { key: 'code_article', label: 'Code Article', editable: false },
                 { key: 'designation', label: 'Désignation', editable: true },
-                { 
-                  key: 'prix_unitaire_ref', 
-                  label: 'Prix Unitaire', 
-                  editable: true, 
-                  format: (val) => `${Number(val).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MAD` 
-                }
+                { key: 'prix_unitaire_ref', label: 'Prix Unitaire', editable: true, format: (val) => `${Number(val).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MAD` }
               ],
-              'articles',
-              'code_article'
+              'articles', 'code_article'
             )}
 
             {activeTab === 'import' && (
               importedData.length === 0 ? (
-                <div className="bg-black/20 py-16 rounded-3xl border border-dashed border-white/10 flex flex-col items-center justify-center text-center animate-fade-in-up">
-                  <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-full flex items-center justify-center mb-6 shadow-sm">
-                    <FileUp className="h-8 w-8 text-red-500" />
-                  </div>
-                  <h3 className="text-xl font-bold text-white mb-2">Importer des données</h3>
-                  <p className="text-gray-400 mb-8 max-w-md text-sm">Déposez vos fichiers Excel (.xlsx, .csv) contenant de nouveaux clients ou objectifs.</p>
+                // THE INJECTION BUFFER (Upload Empty State)
+                <div className="border border-dashed border-white/20 bg-white/[0.01] py-16 md:py-24 px-4 flex flex-col items-center justify-center text-center">
+                  <FileUp className="h-10 w-10 text-gray-600 mb-6" />
+                  <h3 className="text-lg md:text-xl font-serif text-white mb-2">Buffer d'Injection de Données</h3>
+                  <p className="text-gray-500 mb-8 max-w-md text-[10px] md:text-xs uppercase tracking-widest font-mono">Format Requis : .xlsx, .csv</p>
                   <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls, .csv" className="hidden" />
-                  <button onClick={handleUploadClick} className="bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-xl font-medium transition-colors shadow-[0_0_15px_rgba(220,38,38,0.3)]">
-                    Parcourir les fichiers
+                  <button onClick={handleUploadClick} className="border border-red-600 text-red-500 hover:bg-red-600 hover:text-white px-6 md:px-8 py-3 text-[10px] md:text-[11px] uppercase tracking-widest transition-colors font-bold">
+                    Initialiser le transfert
                   </button>
                 </div>
               ) : (
+                // PRE-SYNC PREVIEW
                 <div className="animate-fade-in-up">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 pb-6 border-b border-white/10 gap-4">
                     <div>
-                      <h3 className="text-lg font-bold text-white">Aperçu avant synchronisation</h3>
-                      <p className="text-sm text-gray-400">{importedData.length} lignes détectées</p>
+                      <h3 className="text-lg md:text-xl font-serif text-white">Prévisualisation du Buffer</h3>
+                      <p className="text-[9px] md:text-[10px] text-gray-500 uppercase tracking-widest mt-1 font-mono">{importedData.length} LIGNES EN ATTENTE</p>
                     </div>
-                    <div className="flex flex-wrap gap-3">
-                      <button onClick={handleDiscard} className="flex items-center gap-2 px-4 py-2 text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-sm font-medium transition-colors">
-                        <Trash2 className="h-4 w-4" /> Annuler
+                    <div className="flex flex-wrap gap-3 md:gap-4">
+                      <button onClick={handleDiscard} className="text-[9px] md:text-[10px] uppercase tracking-widest text-gray-500 hover:text-red-500 transition-colors flex items-center gap-2">
+                        <Trash2 className="h-3 w-3" /> Purger
                       </button>
-                      <button onClick={handleCleanData} className="flex items-center gap-2 px-4 py-2 text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 rounded-xl text-sm font-medium transition-colors">
-                        <Wand2 className="h-4 w-4" /> Nettoyer
+                      <button onClick={handleCleanData} className="text-[9px] md:text-[10px] uppercase tracking-widest text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-2">
+                        <Wand2 className="h-3 w-3" /> Formater
                       </button>
-                      <button onClick={handleSyncToDatabase} className="flex items-center gap-2 px-4 py-2 text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl text-sm font-medium transition-colors shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-                        <Send className="h-4 w-4" /> Synchroniser DB
+                      <button onClick={handleSyncToDatabase} className="bg-white text-black hover:bg-gray-200 px-5 md:px-6 py-2 text-[9px] md:text-[10px] uppercase tracking-widest font-bold transition-colors flex items-center gap-2">
+                        <Send className="h-3 w-3" /> Exécuter Injection
                       </button>
                     </div>
                   </div>
-                  <div className="overflow-auto max-h-[500px] custom-scrollbar rounded-2xl border border-white/10">
-                    <table className="w-full text-left border-collapse min-w-[800px]">
-                      <thead className="sticky top-0 bg-[#0a0f1c] z-10 shadow-sm">
+                  
+                  {/* PREVIEW TABLE */}
+                  <div className="overflow-auto max-h-[600px] custom-scrollbar border border-white/10 bg-[#050505]">
+                    <table className="w-full text-left border-collapse min-w-[700px] md:min-w-[800px]">
+                      <thead className="sticky top-0 bg-[#0a0a0a] z-10 border-b border-white/10">
                         <tr>
-                          <th className="p-4 text-xs font-semibold text-gray-400 uppercase w-12 text-center border-b border-white/10">#</th>
+                          <th className="p-3 md:p-4 text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-gray-600 w-12 text-center border-r border-white/5">SEQ</th>
                           {fileHeaders.map((header, idx) => (
-                            <th key={idx} onClick={() => handleSort(header)} className="p-4 text-xs font-semibold text-gray-400 uppercase border-b border-white/10 cursor-pointer hover:bg-white/5 transition-colors">
-                              <div className="flex items-center gap-2">{header} <ArrowUpDown className="h-3 w-3 opacity-50" /></div>
+                            <th key={idx} onClick={() => handleSort(header)} className="p-3 md:p-4 text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-gray-500 cursor-pointer hover:text-white transition-colors">
+                              <div className="flex items-center gap-2">{header} <ArrowUpDown className="h-3 w-3 opacity-30" /></div>
                             </th>
                           ))}
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y divide-white/5">
                         {importedData.map((row, rowIndex) => (
-                          <tr key={rowIndex} className="hover:bg-white/[0.02] transition-colors border-b border-white/5">
-                            <td className="p-4 text-sm font-bold text-gray-500 text-center">{rowIndex + 1}</td>
+                          <tr key={rowIndex} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="p-3 md:p-4 text-xs font-mono text-gray-600 text-center border-r border-white/5">{rowIndex + 1}</td>
                             {fileHeaders.map((header, colIndex) => (
-                              <td key={colIndex} className="p-4 text-sm font-medium text-gray-300">
-                                {row[header] !== undefined && row[header] !== null && row[header] !== "" ? row[header] : <span className="text-red-400 text-xs italic">Vide</span>}
+                              <td key={colIndex} className="p-3 md:p-4 text-xs md:text-sm font-mono text-gray-300">
+                                {row[header] !== undefined && row[header] !== null && row[header] !== "" ? row[header] : <span className="text-red-500/50 text-xs">NULL</span>}
                               </td>
                             ))}
                           </tr>
@@ -456,18 +407,16 @@ export default function DataHub() {
               )
             )}
           </div>
-          
         </main>
       </div>
 
-      {/* TOAST */}
+      {/* STRICT CINEMATIC TOAST */}
       {toast.show && (
-        <div className={`fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-xl border text-sm font-bold z-50 transition-all animate-fade-in-up ${
-          toast.type === 'success' ? 'bg-emerald-600 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]' : toast.type === 'error' ? 'bg-red-600 border-red-500 text-white shadow-[0_0_20px_rgba(220,38,38,0.4)]' : 'bg-blue-600 border-blue-500 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]'
+        <div className={`fixed bottom-6 right-6 md:bottom-8 md:right-8 flex items-center gap-4 px-5 py-3 md:px-6 md:py-4 border-l-4 z-50 bg-[#111] border-y border-r border-white/10 text-xs md:text-sm font-medium transition-all animate-fade-in-up ${
+          toast.type === 'success' ? 'border-l-emerald-500 text-white' : 
+          toast.type === 'error' ? 'border-l-red-500 text-red-100' : 
+          'border-l-blue-500 text-white'
         }`}>
-          {toast.type === 'success' && <CheckCircle2 className="h-5 w-5" />}
-          {toast.type === 'error' && <AlertCircle className="h-5 w-5" />}
-          {toast.type === 'info' && <RefreshCw className="h-5 w-5" />}
           {toast.message}
         </div>
       )}
