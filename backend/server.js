@@ -497,7 +497,7 @@ app.put('/api/articles/:id', (req, res) => {
 
 
 // ==========================================
-// AI ASSISTANT ROUTE (INTELLIGENCE RESTORED + CRASH PROTECTION)
+// AI ASSISTANT ROUTE (STRICT ENTERPRISE SQL + TIME AWARENESS)
 // ==========================================
 app.post('/api/ai-query', async (req, res) => {
     try {
@@ -505,22 +505,44 @@ app.post('/api/ai-query', async (req, res) => {
 
         if (!prompt) return res.status(400).json({ error: "Prompt is required." });
 
+        // ---------------------------------------------------------
+        // ÉTAPE 0 : PRE-FETCH DU CONTEXTE TEMPOREL (TIME AWARENESS)
+        // ---------------------------------------------------------
+        let latestDateContext = "";
+        try {
+            const dateResult = await new Promise((resolve, reject) => {
+                db.query("SELECT MAX(date_facture) as max_date FROM v_factures_globales", (err, results) => {
+                    if (err) reject(err);
+                    else resolve(results);
+                });
+            });
+            
+            if (dateResult.length > 0 && dateResult[0].max_date) {
+                const maxDate = new Date(dateResult[0].max_date);
+                const month = maxDate.getMonth() + 1; // JS months are 0-indexed
+                const year = maxDate.getFullYear();
+                
+                latestDateContext = `
+                ⚠️ CONTEXTE TEMPOREL : La dernière facture enregistrée date du ${maxDate.toISOString().split('T')[0]}. 
+                Si l'utilisateur demande "ce mois-ci", "le mois en cours", ou "actuellement", tu DOIS obligatoirement filtrer sur le mois ${month} et l'année ${year} (Exemple : MONTH(date_facture) = ${month} AND YEAR(date_facture) = ${year}). N'utilise PAS CURRENT_DATE().`;
+            }
+        } catch (e) {
+            console.error("Erreur de récupération de la date max:", e);
+        }
+
         const dbSchema = `
-        Schéma de la base de données Pegasus :
-        - dim_commerciaux (id_commercial, nom_commercial, division, objectif_annuel)
-        - dim_clients (code_client, nom_client)
-        - dim_articles (code_article, designation, prix_unitaire_ref)
-        - fact_factures_entetes (numero_fac, date_facture, id_commercial, code_client, total_ht)
-        - fact_factures_lignes (id_ligne, numero_fac, code_article, qte, prix_unitaire, total_ht_ligne, devise)
+        Schéma de la table OBLIGATOIRE (Vue Unifiée) :
         - v_factures_globales (numero_fac, date_facture, code_client, nom_client, nom_commercial, division, code_article, designation, qte, prix_unitaire, total_ht_ligne, devise)
 
+        ${latestDateContext}
+
         Règles SQL Strictes & Anti-Crash (TRÈS IMPORTANT) :
-        1. UTILISATION DE LA VUE : Dès qu'une question implique un nom de produit (designation), un client (nom_client) ou un commercial (nom_commercial), utilise UNIQUEMENT la vue 'v_factures_globales'.
-        2. INTERDICTION DE JOIN SUR LA VUE : La vue 'v_factures_globales' contient DÉJÀ toutes les informations. Ne fais JAMAIS de JOIN si tu l'utilises.
-        3. COLONNES DE LA VUE : Dans 'v_factures_globales', le chiffre d'affaires s'appelle 'total_ht_ligne' (pas 'total_ht').
-        4. RÈGLE D'AGRÉGATION : Pour trouver un "meilleur", utilise un alias. Exemple EXACT et PARFAIT : SELECT nom_commercial, SUM(total_ht_ligne) AS total_ventes FROM v_factures_globales GROUP BY nom_commercial ORDER BY total_ventes DESC LIMIT 1.
-        5. FILTRES TEMPORELS : Utilise les fonctions natives (Ex: MONTH(date_facture) = 1 pour Janvier).
-        6. RECHERCHE DE TEXTE : Si la question cherche un nom spécifique (client ou article), utilise LIKE '%mot%' en SQL pour éviter les erreurs de casse ou de frappe.
+        1. UTILISATION EXCLUSIVE : Fais TOUTES tes requêtes UNIQUEMENT sur la table 'v_factures_globales'. Ne fais JAMAIS de JOIN. N'invente AUCUNE table.
+        2. ATTENTION AUX COLONNES : N'utilise STRICTEMENT QUE les colonnes listées ci-dessus. Par exemple, pour grouper par commercial, utilise 'nom_commercial' (n'utilise JAMAIS 'id_commercial' car elle n'existe pas ici).
+        3. INTERDICTION DES LIGNES BRUTES : Ne fais JAMAIS un SELECT brut de toutes les lignes (ex: SELECT * FROM ...). Tu DOIS TOUJOURS faire des agrégations (SUM, COUNT, AVG) et grouper les résultats (GROUP BY).
+        4. CHIFFRE D'AFFAIRES : Le chiffre d'affaires s'appelle 'total_ht_ligne' (pas 'total_ht').
+        5. FILTRES TEMPORELS : Respecte scrupuleusement le CONTEXTE TEMPOREL fourni ci-dessus pour les dates.
+        6. EXEMPLE DE RÉPONSE PARFAITE : SELECT nom_commercial, SUM(total_ht_ligne) AS ca_total FROM v_factures_globales WHERE MONTH(date_facture) = 5 AND YEAR(date_facture) = 2026 GROUP BY nom_commercial ORDER BY ca_total DESC LIMIT 1;
         `;
 
         // ÉTAPE 1 : Routeur d'intention & Génération SQL
@@ -529,29 +551,36 @@ app.post('/api/ai-query', async (req, res) => {
             messages: [
                 { 
                     role: 'system', 
-                    content: `Tu es le routeur central de SEHI Pegasus.
-                    RÈGLE 1 : Si l'utilisateur dit juste "bonjour", "hi", "merci", ou pose une question qui n'a AUCUN rapport avec la base de données, tu DOIS répondre EXACTEMENT par un seul mot : CHITCHAT
-                    RÈGLE 2 : Si la question concerne les données, tu es un ingénieur SQL. Génère UNIQUEMENT la requête SQL brute commençant par SELECT. Aucun markdown, aucun texte explicatif.
+                    content: `Tu es un ingénieur base de données expert.
+                    Si la question n'a AUCUN RAPPORT avec l'analyse de données (ex: "bonjour", "ça va", "merci"), réponds STRICTEMENT par le mot : CHITCHAT
                     
+                    Si c'est une question sur les données, génère UNIQUEMENT une requête SQL valide commençant par SELECT. Ne rajoute AUCUN texte explicatif, AUCUN bonjour, AUCUNE balise markdown. Juste la requête SQL pure.
                     ${dbSchema}` 
                 },
                 { role: 'user', content: prompt }
             ],
-            options: { temperature: 0 } 
+            options: { temperature: 0 } // Température 0 = logique pure
         });
 
-        let generatedSQL = sqlGenerationResponse.message.content.trim().replace(/```sql/g, '').replace(/```/g, '').trim();
+        // Nettoyage agressif pour extraire le SQL
+        let rawSql = sqlGenerationResponse.message.content.trim();
+        let generatedSQL = rawSql.replace(/```sql/ig, '').replace(/```/g, '').trim();
+        
+        const selectMatch = generatedSQL.match(/SELECT[\s\S]*?(?:;|$)/i);
+        if (selectMatch) {
+            generatedSQL = selectMatch[0];
+        }
 
-        console.log("🤖 Action de l'IA :", generatedSQL);
+        console.log("🤖 SQL Généré :", generatedSQL);
 
         // 🟢 BIFURCATION : GESTION DES SALUTATIONS (CHIT-CHAT)
-        if (generatedSQL.toUpperCase() === 'CHITCHAT') {
+        if (generatedSQL.toUpperCase() === 'CHITCHAT' || !generatedSQL.toUpperCase().startsWith('SELECT')) {
             const chatResponse = await ollama.chat({
                 model: 'llama3.1',
                 messages: [
                     { 
                         role: 'system', 
-                        content: 'Tu es l\'assistant IA amical et professionnel de SEHI Pegasus. Réponds poliment et de façon concise. Réponds toujours dans la même langue que l\'utilisateur.' 
+                        content: 'Tu es Pegasus, l\'assistant IA de SEHI. Tu dois répondre poliment, de façon très concise. Si l\'utilisateur demande tes capacités, dis que tu peux analyser le Chiffre d\'Affaires, les performances des commerciaux, et les tendances produits.' 
                     },
                     { role: 'user', content: prompt }
                 ],
@@ -560,12 +589,7 @@ app.post('/api/ai-query', async (req, res) => {
             return res.json({ answer: chatResponse.message.content });
         }
 
-        // 🔴 SÉCURITÉ SQL (Seulement si ce n'est pas du Chit-Chat)
-        if (!generatedSQL.toUpperCase().startsWith('SELECT')) {
-            return res.status(400).json({ answer: "Requête non autorisée. Je ne peux exécuter que des lectures (SELECT) ou répondre à des questions simples." });
-        }
-
-        // ÉTAPE 2 : Exécution de la requête avec wrapper Promise de sécurité
+        // ÉTAPE 2 : Exécution de la requête
         let dbResults;
         try {
             dbResults = await new Promise((resolve, reject) => {
@@ -574,11 +598,21 @@ app.post('/api/ai-query', async (req, res) => {
                     else resolve(results);
                 });
             });
+
+            if (!dbResults || dbResults.length === 0) {
+                return res.json({ 
+                    answer: "📊 **Constat :** Aucune donnée n'a été trouvée pour cette requête dans la base SEHI.\n\n💡 **Analyse :** Il est possible que les critères recherchés (date, nom) ne correspondent à aucune facture existante.\n\n🚀 **Recommandation :** Vérifiez l'orthographe ou essayez d'élargir la période de recherche.\n\n🔮 **Prédiction :** N/A" 
+                });
+            }
+
+            if (dbResults.length > 50) {
+                dbResults = dbResults.slice(0, 50);
+            }
+
         } catch (dbError) {
-            console.error("❌ SQL généré invalide :", generatedSQL);
             console.error("❌ Erreur MySQL :", dbError.message);
             return res.json({ 
-                answer: `Désolé, j'ai généré une requête SQL invalide en tentant de croiser ces données.\n\n**Requête :** ${generatedSQL}\n**Erreur interne :** ${dbError.message}` 
+                answer: `Désolé, j'ai rencontré une anomalie lors du traitement SQL.\n\n**Erreur technique :** ${dbError.message}` 
             });
         }
 
@@ -588,33 +622,33 @@ app.post('/api/ai-query', async (req, res) => {
             messages: [
                 { 
                     role: 'system', 
-                    content: `Tu es un Senior Data Analyst chez SEHI Pegasus.
-                    On te fournit une question et les résultats de la base de données.
-                    RÈGLE 1 : Réponds dans la langue de l'utilisateur.
-                    RÈGLE 2 : Tu DOIS structurer ta réponse exactement avec ces 4 parties (utilise des emojis et du gras) :
+                    content: `Tu es l'Analyste de Données Exécutif de Pegasus Hub (SEHI).
+                    L'utilisateur a posé une question. Voici les données SQL brutes qui y répondent : ${JSON.stringify(dbResults)}
+
+                    RÈGLES ABSOLUES (Toute violation est inacceptable) :
+                    1. NE FAIS AUCUNE INTRODUCTION ("Voici les données...", "D'après les résultats...").
+                    2. Tu DOIS COMMENCER directement ta réponse par "📊 **Constat :**".
+                    3. Ta réponse doit être structurée EXACTEMENT avec ces 4 sections, sans sauter de ligne à l'intérieur d'une section :
                     
-                    **📊 Constat :** (La réponse directe et factuelle à la question)
-                    **💡 Analyse :** (Ce que ce chiffre signifie pour le business)
-                    **🚀 Recommandation :** (Une action stratégique à prendre)
-                    **🔮 Prédiction :** (Une projection logique basée sur ce contexte)
-                    
-                    RÈGLE 3 (CRITIQUE) : Formate TOUS les montants financiers avec la devise "MAD" (Dirham). N'utilise JAMAIS, sous AUCUN prétexte, le symbole Euro (€) ou Dollar ($). Les montants doivent être formatés proprement (ex: 15 420.50 MAD).
-                    
-                    Sois professionnel, percutant et visionnaire. Ne parle jamais de la requête SQL.` 
+                    📊 **Constat :** (Les chiffres précis tirés des données brutes)
+                    💡 **Analyse :** (Explication courte de l'impact business)
+                    🚀 **Recommandation :** (Action à mener pour SEHI)
+                    🔮 **Prédiction :** (Tendance future courte)
+
+                    4. FORMATAGE FINANCIER : Tous les montants financiers doivent obligatoirement utiliser "MAD" (Dirham). N'utilise JAMAIS € ou $. Ex: "12 500 000 MAD".
+                    5. Utilise le vouvoiement.
+                    ` 
                 },
-                { 
-                    role: 'user', 
-                    content: `Question : "${prompt}"\n\nDonnées extraites : ${JSON.stringify(dbResults)}` 
-                }
+                { role: 'user', content: prompt }
             ],
-            options: { temperature: 0.7 } 
+            options: { temperature: 0.4 } 
         });
 
         res.json({ answer: finalAnalysisResponse.message.content });
 
     } catch (error) {
         console.error("Erreur globale:", error);
-        res.status(500).json({ answer: "Erreur critique du serveur IA. Vérifiez les logs Node.js." });
+        res.status(500).json({ answer: "Erreur critique du serveur IA. La connexion au processeur neuronal a échoué." });
     }
 });
 

@@ -113,7 +113,7 @@ export default function Dashboard() {
           plotOptions: { 
             pie: { 
               innerSize: '65%', 
-              size: '75%', 
+              size: '55%', 
               borderWidth: 1, 
               borderColor: '#000', 
               allowPointSelect: true, 
